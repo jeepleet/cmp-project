@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Own CMP - Runtime Test Lab</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --primary: #0f766e;
+            --secondary: #334155;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .mode-toggle { 
+            background: #f1f5f9; 
+            padding: 0.5rem; 
+            border-radius: 6px; 
+            display: flex; 
+            align-items: center; 
+            gap: 1rem; 
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+        }
+        button {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        button:hover { background: #f1f5f9; border-color: #cbd5e1; }
+        button.danger { color: #dc2626; border-color: #fecaca; }
+        button.danger:hover { background: #fef2f2; }
+        pre {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            max-height: 400px;
+        }
+        .cookie-list { list-style: none; padding: 0; }
+        .cookie-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px dashed var(--border);
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 0.1rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #e2e8f0;
+        }
+        .status-pill.active { background: #dcfce7; color: #166534; }
+        .scenario-note { font-size: 0.85rem; color: #64748b; margin-top: 0.5rem; }
+    </style>
+    <!-- GTM Google Consent Mode setup (mocking what a site owner would do) -->
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+
+        // Initialize logger early to catch all events
+        window._logEvent = function(data) {
+            const logElement = document.getElementById('datalayer-log');
+            if (!logElement) return;
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '1rem';
+            entry.style.borderBottom = '1px solid #334155';
+            entry.style.paddingBottom = '0.5rem';
+            entry.textContent = JSON.stringify(data, null, 2);
+            
+            if (logElement.textContent === 'Waiting for events...') {
+                logElement.textContent = '';
+            }
+            logElement.prepend(entry);
+        };
+
+        const originalPush = window.dataLayer.push;
+        window.dataLayer.push = function() {
+            const args = Array.prototype.slice.call(arguments);
+            window._logEvent(args[0]);
+            return originalPush.apply(window.dataLayer, arguments);
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Own CMP - Runtime Test Lab</h1>
+            <p>Use this page to manually verify CMP behavior and dataLayer events.</p>
+        </header>
+
+        <div class="mode-toggle">
+            <strong>Environment:</strong>
+            <label>
+                <input type="radio" name="env-mode" value="production"> Production
+            </label>
+            <label>
+                <input type="radio" name="env-mode" value="preview"> Preview (Draft)
+            </label>
+            <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">Preview mode requires active admin session.</span>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Laboratory Controls</h2>
+                <div class="controls">
+                    <button id="reset-consent" class="danger">Reset All Consent & Cookies</button>
+                    <button id="open-preferences">Open Consent Preferences</button>
+                    <button id="set-dummy-cookies">Set Dummy Cookies (Test Cleanup)</button>
+                    <button id="view-changelog">View Public Changelog</button>
+                    <button onclick="window.location.reload()">Reload Page</button>
+                </div>
+                <div class="scenario-note">
+                    <strong>Set Dummy Cookies</strong> will create <code>_ga</code> and <code>_gcl_aw</code> cookies to test if they get cleaned up when you reject categories.
+                </div>
+
+                <h2 style="margin-top: 2rem;">Browser State</h2>
+                <div id="browser-info">
+                    <p>GPC Detected: <span id="gpc-status" class="status-pill">-</span></p>
+                </div>
+                <h3>Active Cookies</h3>
+                <ul id="cookie-display" class="cookie-list"></ul>
+            </div>
+
+            <div class="card">
+                <h2>dataLayer Activity</h2>
+                <div class="controls">
+                    <button id="clear-logs">Clear Log</button>
+                </div>
+                <pre id="datalayer-log">Waiting for events...</pre>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h2>Performance Lab</h2>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; border-top: none; padding-top: 0;">
+                <div>
+                    <h3>Real-time Metrics</h3>
+                    <ul class="cookie-list" id="metrics-list">
+                        <li><span>Config Latency</span> <strong id="metric-config">-</strong></li>
+                        <li><span>Time to Banner</span> <strong id="metric-banner">-</strong></li>
+                        <li><span>Interaction Delay (INP)</span> <strong id="metric-inp">-</strong></li>
+                    </ul>
+                    <div class="scenario-note">
+                        Metrics are measured in milliseconds (ms). "Good" interaction delay is under 200ms.
+                    </div>
+                </div>
+                <div>
+                    <h3>Industry Benchmark</h3>
+                    <style>
+                        .bar-container { margin-bottom: 10px; }
+                        .bar-label { font-size: 11px; font-weight: 700; color: var(--secondary); margin-bottom: 2px; }
+                        .bar-bg { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; }
+                        .bar-fill { height: 100%; transition: width 0.5s ease-out; }
+                        .fill-industry { background: #94a3b8; }
+                        .fill-own { background: #0f766e; }
+                    </style>
+                    <div class="bar-container">
+                        <div class="bar-label">Typical Enterprise CMP Load (300ms)</div>
+                        <div class="bar-bg"><div class="bar-fill fill-industry" style="width: 80%"></div></div>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-label">Own CMP Load (<span id="load-val-own">-</span>ms)</div>
+                        <div class="bar-bg"><div class="bar-fill fill-own" id="load-bar-own" style="width: 0%"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOCK GPC for testing purposes if query param is present -->
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('mockGpc')) {
+            Object.defineProperty(navigator, 'globalPrivacyControl', {
+                value: urlParams.get('mockGpc') === 'true',
+                configurable: true
+            });
+        }
+        document.getElementById('gpc-status').textContent = navigator.globalPrivacyControl ? 'ON' : 'OFF';
+        if (navigator.globalPrivacyControl) document.getElementById('gpc-status').classList.add('active');
+    </script>
+
+    <!-- Load the CMP -->
+    <script id="owncmp-loader">
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const env = urlParams.get('env') === 'preview' ? 'preview' : 'production';
+            
+            // Set radio state
+            document.addEventListener('DOMContentLoaded', () => {
+                document.querySelector(`input[name="env-mode"][value="${env}"]`).checked = true;
+                
+                document.querySelectorAll('input[name="env-mode"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        urlParams.set('env', e.target.value);
+                        window.location.search = urlParams.toString();
+                    });
+                });
+            });
+
+            const script = document.createElement('script');
+            script.src = "/cmp/owncmp.js";
+            script.dataset.siteId = "demo-site";
+            script.dataset.configUrl = `/api/public/config/demo-site/${env}`;
+            script.id = "owncmp-script";
+            script.defer = true;
+            document.head.appendChild(script);
+        })();
+    </script>
+
+    <script>
+        // Drain any events that happened before DOM was ready
+        window.dataLayer.forEach(item => window._logEvent(item));
+
+        // UI Interactions
+        document.getElementById('reset-consent').addEventListener('click', () => {
+            // Clear owncmp cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
+        });
+
+        document.getElementById('open-preferences').addEventListener('click', () => {
+            if (window.OwnCMP) window.OwnCMP.openBanner();
+        });
+
+        document.getElementById('set-dummy-cookies').addEventListener('click', () => {
+            document.cookie = "_ga=GA1.1.123456789.123456789; path=/; max-age=31536000";
+            document.cookie = "_gcl_aw=GCL.123456789.123456789; path=/; max-age=31536000";
+            document.cookie = "test_cookie=test_value; path=/; max-age=31536000";
+            updateCookieDisplay();
+            alert("Dummy cookies set: _ga, _gcl_aw, test_cookie");
+        });
+
+        document.getElementById('view-changelog').addEventListener('click', async () => {
+            const config = window.OwnCMP?.getConfig();
+            if (!config) return alert('CMP not loaded');
+            try {
+                const res = await fetch(`/api/public/changelog/${config.siteId}`);
+                const data = await res.json();
+                if (data.length === 0) return alert('No changelog entries found.');
+                alert('Latest changes:\n' + data.map(entry => `- ${new Date(entry.publishedAt).toLocaleDateString()}: ${entry.summary}`).join('\n'));
+            } catch (e) {
+                alert('Failed to load changelog: ' + e.message);
+            }
+        });
+
+        document.getElementById('clear-logs').addEventListener('click', () => {
+            document.getElementById('datalayer-log').textContent = 'Waiting for events...';
+        });
+
+        function updateCookieDisplay() {
+            const display = document.getElementById('cookie-display');
+            display.innerHTML = '';
+            const cookies = document.cookie.split(';');
+            if (!document.cookie || document.cookie === '') {
+                display.innerHTML = '<li>No cookies found</li>';
+                return;
+            }
+            cookies.forEach(c => {
+                const parts = c.trim().split('=');
+                if (parts.length < 2) return;
+                const name = parts[0];
+                const value = parts.slice(1).join('=');
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${name}</span><span style="color: #64748b">${value.substring(0, 15)}${value.length > 15 ? '...' : ''}</span>`;
+                display.appendChild(li);
+            });
+        }
+
+        setInterval(updateCookieDisplay, 1000);
+        updateCookieDisplay();
+
+        function updatePerformance() {
+            if (!window.OwnCMP || typeof window.OwnCMP.getPerformanceMetrics !== 'function') return;
+            const metrics = window.OwnCMP.getPerformanceMetrics();
+            if (!metrics) return;
+
+            const format = (ms) => (ms != null && !isNaN(ms)) ? Math.round(ms) + 'ms' : '-';
+            
+            document.getElementById('metric-config').textContent = format(metrics.configLatency);
+            document.getElementById('metric-banner').textContent = format(metrics.timeToBanner);
+            document.getElementById('metric-inp').textContent = format(metrics.interactionDelay);
+
+            // Update bar
+            const loadMs = metrics.timeToBanner || metrics.configLatency || 0;
+            document.getElementById('load-val-own').textContent = Math.round(loadMs);
+            const barWidth = Math.max(2, Math.min((loadMs / 400) * 100, 100));
+            document.getElementById('load-bar-own').style.width = barWidth + '%';
+        }
+
+        setInterval(updatePerformance, 1000);
+
+        // Debug: Log config once CMP is loaded
+        window.addEventListener('load', () => {
+            if (window.OwnCMP) {
+                console.log('[Test Lab] OwnCMP found. Config:', window.OwnCMP.getConfig());
+                const config = window.OwnCMP.getConfig();
+                document.getElementById('cmp-version').textContent = 'v' + window.OwnCMP.version;
+                document.getElementById('config-version').textContent = config.version || 'unknown';
+                if (config.version === 'draft') document.getElementById('config-version').classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+The honest Consent Manager checklist: CMP features vs. real-world requirements
+
+My problems are certainly not comparable to Anton’s in *Hard to Be a God*, but agnostics sometimes have a hard time too. When it comes to web analytics, tag managers, reporting platforms and other topics, I like to describe myself as “tool-agnostic.” In very few categories, however, do I find that as difficult as with consent management platforms. And although my points of contact are primarily with the often very bumpy interaction between consent managers, Consent Mode and tag managers (see my e-book on that ;)), and that area already has enough pitfalls of its own, I also know a thing or two from practice about the backend side and the processes embedded in the tools.
+
+Usually when things are not running smoothly. But since part of my everyday work is helping clients implement and optimize tracking setups - and the CMP is the first and often most painful switch point - I am occasionally asked for advice on which tool to buy. Because the old one either clearly cannot meet data protection requirements at first glance, has become too expensive, or has simply left a bad impression. With the API, reliability, design options for the consent dialog... there are plenty of reasons.
+
+Just today, another one of those requests landed in my inbox, the kind I have received in similar form several times before: a larger company wants to replace its existing CMP. In this case OneTrust, which is not exactly uncommon, *cough*, and has put together a requirements profile in an Excel list. Different vendors are supposed to respond to this list, and I received one such example with feedback from one of the vendors. That sounds like a reasonable process. And it is - but unfortunately only at first glance.
+
+Contents
+
+* show
+
+## Typical CMP checklist: all requirements covered.
+
+The list contained the usual suspects: language localization, easy withdrawal, Consent Mode v2 (although only in relation to Google, not a word about MS Ads or Clarity - so be it), cookie scanning, no script blocking by the CMP (which should ideally always be the tag manager’s job anyway), DataLayer integration, Google certification. Everything marked as “Must,” everything obediently answered by the requested vendor with “Compliant,” garnished with links to their own documentation and the occasional marketing superlative.
+
+Checklists with green checkmarks that say nothing: every CMP checklist
+Every CMP checklist in the world: “We can do all of this.” Is that really true?
+
+Most of these points are indeed covered by many vendors. Google itself has a large and constantly growing list of certified CMPs, with which things are generally uncomplicated if you want to run ads. I used this list as inspiration to teach my GTM Consent & Checkup Helper as many tools as possible. Even focusing only on how consent is stored and communicated showed me more fragmentation and edge cases than one would wish for.
+
+And this is exactly where the problem begins. Because that list checks whether a feature exists. Very digital, zero or one, green checkmark or red cross. It does not check how it works. And certainly not how it feels when you are using it for the twentieth time because yet another new service has to be integrated, one that no scanner in the world recognizes. Unfortunately, reality is much more complex here too than the checklists out there would like it to be. Which has to do with where they come from: checklists are created by vendors.
+
+## The answers always sound good
+
+Take DataLayer integration, for example. The vendor writes, roughly: “Our CMP automatically fires multiple events into the DataLayer for perfect tracking, including some_consent_eventname on pageview and consent changes, always with detailed consent variables for tag management integration.”
+
+That sounds great. It sounds like someone who knows what a DataLayer is. What it does not reveal: how many events exactly? In what order? Is there one single reliable event where all consent information is available together and that works as a universal trigger - or does the system fire a full-on barrage of individual events for every category and every vendor, after which, at some point, maybe, hopefully, a summary event arrives? Some systems deliver a clean “Here is the consent status and Consent Mode is now ready” event, and you know where you stand. Others first blast out dozens of individual events, and the event you actually need as a trigger arrives - if at all - only afterwards. In Google Tag Manager, “seamless integration” then turns into a trigger setup that you would not want to explain to anyone. Or you integrate helpers in Custom HTML tags that add the “Now you may” event afterwards, because you need to use the same event ID for Facebook and GA to avoid messing up CAPI deduplication. As I said: details can be decisive.
+
+And let’s not even start on cookie scanners. Well, unfortunately, we have to. “Our solution automatically scans your website, detects all trackers and cookies, and categorizes them by type, vendor, purpose and lifespan.” Again: sounds fantastic. But is the scanner a helpful tool or a mandatory bottleneck?
+
+Cookie scanner at work
+The perfect cookie-scanner unicorn at work: looks everywhere, finds everything and categorizes perfectly. I just have not seen one yet.
+
+There are systems where you first have to implement a tag live on the website - meaning you effectively have to let it fire without consent - so that the scanner can even find the cookie and you can then assign the service to a category. That is not just an absurd workflow; it is a workflow that violates every logic of compliance. And it exists more often than you might think.
+
+## Tip for the demo meeting: the killer test
+
+The one question that reveals more than any feature list:
+
+“Show me how to add a new service that is not yet running on our website. Take something familiar like Pinterest. And then show me the same thing with an obscure niche pixel that your system definitely does not know.”
+
+If the salesperson starts sweating during this demo: beware 😉
+
+Because this is the moment when marketing promises meet reality. This is exactly the process users will go through again and again after the contract has been signed. The scanner does not decide day-to-day usability. The real question is: how quickly and intuitively can I create a service manually? What happens when a new cookie appears in the report and nobody knows what it is? Depending on how much the system tells me about this cookie and how easily I can configure it myself, it will either be a two-minute task or half a day of reading documentation, support tickets with the service provider, searching through docs... and in the end, a lot of frustration. Even I, for many cookies from tracking services I install on behalf of my clients, often genuinely have no idea what purpose they are supposed to serve. Sometimes I do not even know who set them, when, or how. Finding all of that out takes time. Unfortunately, a listing is apparently required (I am not a lawyer - but the good Dr. GDPR once bounced me off this very effectively when I tried to argue it away). But if the vendor sometimes does not know why a cookie exists and how big the disaster is if it is missing, then meeting this requirement is often difficult... or ends in very generic descriptions that help no one.
+
+## The search for an honest checklist
+
+Triggered by the request and my long reply, which on closer reflection had still only scratched the tip of the iceberg, I wanted to know whether there was a CMP checklist somewhere that went beyond the usual feature checkmarks and obvious requirements. One that asks the questions you only learn to ask after your third CMP migration. So I tried what one does today: asked Google’s AI Mode, queried a few LLMs and worked through the results.
+
+The result was - to put it diplomatically - sobering. What I was offered was a mixture of feature descriptions in a maximum of ten words, links to the marketing pages of CMP vendors (which of course all look good for every requirement), and generic compliance blah-blah that could be copied into any data protection presentation without anyone noticing where it came from. Everything you find is produced or parroted, directly or indirectly, by the vendors themselves or through “partners” and “certified consultants.” Independent practical reports from consultants who really implement and maintain CMPs regularly? Nowhere to be found.
+
+So I will do it myself - at least from my perspective, which is heavily shaped by implementation. Since in recent years I have also encountered a few pitfalls beyond the DataLayer through projects or personal experience, I am trying with this post to write exactly the checklist that apparently does not yet exist. No feature matrix, no vendor comparison, no recommendation. Instead: the questions, concepts and details that, to the best of my knowledge, really determine the day-to-day usability of a CMP. I am trying to do this without naming or evaluating a single vendor. Because the concepts are more important than the names, and those who know the right questions can find the right answers themselves. If a single feature discussed here is exclusive to one provider and therefore allows identification: sorry. But truly anonymizing data is harder than you might think 😉
+
+# Part 2: The operational core
+
+## What you should really ask
+
+The following points are what rarely appear in an Excel list. Points that only become relevant when you actually use the tool at a certain scale. Meaning: not every aspect is equally relevant to everyone. If you only need “a banner” so Google re-enables your Ads account and you only run client-side Google Ads and Analytics, you do not need much and can use almost any tool. If an API integration, for whatever reason - consent in the browser, data for analysis - is relevant, or if self-service for many information requests in the “Compliance Center” is the focus, you will need different checkpoints. These arise from real requirements, which do not follow product managers’ ideal ideas, but rather your own requirements profile and existing or planned processes.
+
+## DataLayer integration: when do I know where I stand?
+
+In the introduction, I already mentioned the “continuous fire” problem. It is worth digging deeper here, because the way a CMP communicates consent decisions to the tag manager determines the complexity of the entire setup behind it. Quite apart from the fact that with each of these events, every trigger in the container is asked whether it can do something with it.
+
+The ideal is simple: one event, one point in time, all information - and only then, not “too early” (for example directly from a cookie on subsequent pages after a decision), so as not to make already problematic race conditions even worse. If I can build a single Custom Event trigger in Google Tag Manager that reliably tells me “the consent status is now established, here are the details,” then the setup is manageable.
+
+DataLayer continuous fire: dozens of consent events from a CMP in GTM debug mode
+DataLayer continuous fire in GTM Preview Mode, but at least with a clear signal at the end in Push 15.
+
+A trigger concept where you can safely block everything before this point and just as safely fire everything afterwards can be set up in a manageable and robust way, even with e-commerce events appearing in the DataLayer far too early, with the help of the Data Layer Event Repeater. If I know when I am allowed to fire what, and the CMP communicates changes in the same way as an existing or initial decision, then in the worst case the same event arrives again with updated values, or tracking may miss an e-commerce event like view_item. But the important things that matter for attribution remain intact.
+
+With some systems, however, reality looks different. On pageview, first come initialization events, then individual events per category or even per vendor, then perhaps a ready event, and somewhere in between Consent Mode sets its signals, often multiple times, cheerfully alternating between “default” and “update.” Google cannot invent enough letter combinations to represent that in the gcs parameter (sorry, a very nerdy joke - just ignore it). Which of these events is now the right trigger? The one after which all information is actually available? Sometimes the last one in the chain - but “the last one” is not a stable trigger if the order or number varies depending on the configuration. The result is Custom HTML tags with workarounds that wait until the DataLayer has calmed down, or query the tool’s JS API for details, or have to inspect the cookie themselves to write consent values cleanly and together with the “now really” event into the data layer. It works, of course. But it is an indicator that the CMP integration has not been thought through to the end (and that is sad).
+
+### Checklist question
+
+How many events does the CMP fire into the DataLayer, and which one is the reliable “everything is settled” signal? Is there exactly one - or do I have to construct the right moment myself, use trigger groups or other contortions so that user consent, Consent Mode and events from the shop or CMS can really come together safely and without loss to produce the desired request?
+
+## Who loads whom: CMP and tag manager
+
+A topic that only partially affects the choice of CMP, but that always comes up in this context: does the CMP load the tag manager, or does the tag manager load the CMP? The question sounds academic, but it has very real consequences. If Google Tag Manager is loaded from googletagmanager.com (that is, without first-party serving through solutions such as server-side tagging, Google Tag Gateway, proxies or specialized services), then it is a “third-party script” - and, of all companies, it comes from Google. Anyone who puts their CMP into this tag manager therefore risks the whole package being torpedoed by ad blockers, so neither one nor the other loads.
+
+If the tag manager really only contains the CMP and consent-dependent tagging, that is actually irrelevant. But if the tag manager has other tasks, or - much more likely - if the CMP also needs to block or release things on the website that have nothing to do with tagging (videos, embedded content, third-party iframe stuff), then this package of GTM from Google → CMP is poorly bundled. In the first case, the result is simply “no consent dialog, no consent, no legal tracking.” In the second case, a blocker from the CMP that you relied on (please never do this!) may be missing, and suddenly YouTube videos are loaded without consent, cookies are set and the world ends immediately! Also bad: you do not notice it, because affected users simply pass through without a banner and do not show up in any statistics as “no consent” - they do not show up at all. And hopefully they do not look too closely if cookies and videos are visible anyway.
+
+Despite all the custom templates that many CMPs love to advertise as a way to get “very easily onto the site via Tag Manager”: this route is not ideal. The CMP should ideally be implemented directly on the page. It can manage consent and then load the tag manager, or withhold the integration if needed (with the correct order in the code - please test and do not just believe). If this is tied, for example, to statistics consent, it is not “optimal,” but it is practical. No statistics consent? No tag manager. That is perfectly okay as long as the tag manager really only contains tagging that requires consent. We are explicitly not talking about Advanced Consent Mode here. Anyone who wants to can watch the relevant video for my position on that.
+
+There are reasons and justifications for doing it differently: CMP loads GTM
+Currently the best option when googletagmanager.com is involved: CMP loads GTM after consent
+
+Do I hear an objection? “But then I lose all visitors who allow marketing but reject statistics!” True. Theoretically. In practice, this case is so exotic that it disappears in the noise of normal consent rates. Anyone who actively clicks “Marketing yes, statistics no” is a unicorn among visitors. The vast majority either consent to everything or reject everything. And if you still need the tag manager when “everything rejected,” there are solutions. But this is an architecture decision that should be made consciously, not one that the CMP vendor makes for you.
+
+### Checklist question
+
+How is the CMP deployed, and how can I control the delivery of the tag manager? Is there a fallback strategy for blocked tag managers - and do we need one at all? Does the CMP deliver the tag manager code, or do I block it through attributes directly in the embedded code? Do I need to modify it and possibly use the CMP JavaScript API to load it afterwards? If all I have to do in the CMP is “enter the GTM ID”: beware! If I want to use server-side GTM or a tag gateway, control over incoming or outgoing paths is gone.
+
+## “We block that.” Really?
+
+Many CMPs offer the option to block everything that requires consent. Where you have to modify a script so that it actually cannot execute before the CMP releases or unlocks the script code or iframe integration through modification, that is a valid option. But where “autoblocking” takes place, many things can go wrong:
+
+Order: If the CMP is loaded after the script has already executed, the blocker can only stare desperately after the requests. They are not coming back. This aspect is especially relevant when a lot of consent-requiring stuff is implemented directly into the website (in the template, via plugin, as an “app” in the shop system), but the CMP is loaded late. For example, via the tag manager, which makes the loading-order choice described above even clearer.
+
+Interactions: If a blocker goes too far and blocks everything that looks like tracking, that can become a problem. Elements are missing from your own website. In the simplest case, you notice because the popular “stage” on the homepage with all the colorful pictures is missing. It gets worse if, in checkout and only for payment method X, the payment provider’s widget is blocked.
+
+Reliability and transparency: How do you know that everything is really being blocked? Relying on a global plaster for everything can create false security, while in the background and only on certain pages, requests go through that should never have left the browser without consent. Instead of relying on a black box, a CMP should make it as easy as possible to explicitly mark directly implemented code with attributes or similar information about the conditions under which it may be delivered. Everything else must and should be handled in the tag manager.
+
+Today great, tomorrow broken: What happens if a blocker works with explicit patterns of known tracking services, and you successfully tested that the blocker works, but tomorrow the service provider changes its format, endpoint or script name in a new version and that change goes live? If the blocker fails from that point onward, you will not notice immediately - bad conditions.
+
+### Checklist question
+
+If there is a blocker: how exactly does it work, and what conditions must be established to ensure that it functions? What about other scripts it does not know? Can scripts be adjusted to control blocking precisely, or is the answer “it’ll probably work”?
+
+## Service configuration in everyday use: beyond the killer test
+
+The killer test from the previous section shows whether manually creating a service is fundamentally possible and reasonably intuitive. But it does not yet show what everyday life looks like afterwards. Because a service is not created once and then never touched again.
+
+What happens when the tracking pixel provider changes its cookie names? Or adds a new cookie that appears as “unknown” in the next scan? How easy is it to add a cookie to an existing service without having to reconfigure the whole setup? And - a question I have learned to ask through painful experience - is there a changelog or notification when the CMP itself updates its predefined service templates? Some systems update their internal database, and suddenly a service you configured months ago has different cookie assignments than before. Without you having changed anything. More on that in the section about silent changes, which can also affect other areas such as APIs or cookie formats, from which you are forced to help yourself if the DataLayer provides too little support.
+
+Another practical test that has proven useful: how do I handle a service that does not set cookies but still requires consent? Pixel tracking via image requests, fingerprinting libraries, services that work exclusively with localStorage or sessionStorage, third-party content in iframes - all of this exists in the wild, and a CMP that is conceptually built around “cookie = service” logically reaches its limits.
+
+### Checklist question
+
+How do I update an existing service? Am I notified about changes to predefined templates? Can I create services that do not use cookies?
+
+## Usability: not “which features,” but “who can use them”
+
+Feature lists check whether something is possible. They do not check who can - or should - operate it. That sounds like a soft criterion, but in day-to-day corporate reality it is one of the hardest factors of all. If the legal team wants to adjust the text in the consent dialog because the legal situation has changed or an audit requires new wording: who can implement that? Directly in the CMP interface, without involving IT? Or is “customizing” a euphemism for someone having to edit a JSON configuration or CSS file, which then has to go through the deployment process? In some systems, “text change in the banner” means a developer ticket, code review and deployment. For one sentence... whose previous state may also need to be provable in case of doubt. Endless detail questions...
+
+The same applies to languages. “Supports 65 languages” sounds impressive in a feature matrix. But what does the process look like when I add a new language? Can I enter translations directly, or do I have to open a support ticket with the CMP vendor? Do all services have to be reconfigured per language, or must a change be entered 65 times afterwards? How does language detection work in the first place - via browser, URL, geolocation? And what happens if no rule applies: do I see no banner (bad), an English banner (acceptable), one in Dutch (true story, funny), or none at all and consent falls back to “denied” (damn!)?
+
+Role concepts are another blind spot. In larger organizations, different people work with the CMP: legal department, marketing, IT, external agencies. The question is not whether there are “different roles” (green checkmark, next item), but how granular they are. Can the legal department change texts without accidentally destroying the DataLayer configuration? Can the agency create services without access to billing data or visitors’ consent history? It is not about whether there is a role concept, but whether in practice it prevents well-intentioned changes from having unintended side effects, or prevents everyone from reflexively wanting to sign contracts with every external service provider out of fear of the GDPR - contracts that only make lawyers happy (do not ask).
+
+### Checklist question
+
+Who in the company needs to work with the CMP regularly, and what can that person do without IT support? Is there a demo environment where changes can be tested before they go live?
+
+## Pricing: the art of incomparable volumes
+
+That different vendors have different prices surprises no one. That pricing is based on completely different metrics and is therefore practically impossible to compare should surprise hardly anyone either.
+
+One vendor charges by “sessions.” What is a session? Thirty minutes of inactivity as the dividing line, as in Google Analytics? Or simply a new session every 30 minutes? Or something else entirely? Are bots and crawlers counted, which on some websites can easily make up 30-40% of “traffic,” even if they do not interact with the CMP at all but simply execute JavaScript, because that is just what happens today? The next vendor charges by “monthly active users.” Does a user who returns on five days count as one or five? And how is a “user” even identified if the CMP, by definition, may only set a cookie after consent? Another vendor charges by “consent decisions” - meaning only interactions with the banner. That is probably the fairest metric, because at least it measures what the CMP actually does. But it makes it impossible to compare costs with a session-based model, because the numbers are in completely different orders of magnitude.
+
+The real challenge is therefore not the price per unit, but estimating your own volume in the respective metric. And this is where it gets hairy. Most companies know their pageviews from analytics (although that number without consent only represents part of reality anyway), but not their “consent decisions” or their “MAUs according to the CMP definition.” So you estimate. And the vendor is happy to help with the estimate - with surprisingly optimistic numbers that usually work out in the first contract year. By the second year at the latest, when traffic has grown or the bot situation has changed or the vendor has “optimized” its counting methodology, it becomes more expensive than planned. Suddenly log file analysis is dug out again to determine numbers. A good idea, of course, but with great potential to overestimate the expected volume. “Better take the next larger plan.” Sure 😉
+
+At least as important as the price itself: what happens if you exceed the limit? The spectrum ranges from “the banner is hidden” (which means no visitor can consent anymore, bringing all tracking to a halt), to “automatic upgrade to the next pricing tier” (welcome to the cost trap), to “we’ll turn a blind eye and talk about it next quarter” (surprisingly common in enterprise contracts, but not something you should use as a planning basis).
+
+### Checklist question
+
+Which metric is the price based on, how exactly is this metric defined, and how can I reliably estimate my volume in this metric in advance? What happens if I exceed the limit - technically and commercially?
+
+# Part 3: Architecture & technology
+
+## What lurks under the hood
+
+The previous points concern everyday operations: setup, usability, costs. What follows is more technical and concerns the architecture of the CMP itself. Not everyone who selects a CMP needs to understand all of this in detail. But someone on the team should. And being able to ask the right questions during the sales process does not hurt, even if you cannot evaluate the answers down to the last detail yourself.
+
+## Performance: measure, do not feel
+
+“Our script is lightweight and SEO-friendly” appears, in one form or another, on every second CMP website. Nice. But what does that mean in numbers?
+
+Since Google established Core Web Vitals as a ranking factor, and especially since INP (Interaction to Next Paint) was added as a metric, the performance of a CMP can be measured quite specifically. It is no longer just about whether the banner appears “quickly,” but what happens when someone clicks “Accept all.” This click triggers a cascade: consent is stored, Consent Mode signals are set, the DataLayer receives its events, tags fire, external scripts are loaded. All of this happens at the same moment, on the same browser main thread. And if the CMP does not play along cleanly, it blocks the thread for so long that the browser’s visual feedback (banner disappears, page responds again) is noticeably delayed. That then becomes a poor INP score - and Google measures this with real users, not just in the lab.
+
+Interestingly, there is an architectural difference here that is rarely discussed: some CMPs render their banner in an iframe, others directly in the page DOM or Shadow DOM. The iframe variant isolates the interaction from the rest of the page, which in tests leads to dramatically better INP values (single-digit milliseconds vs. triple-digit). That does not mean iframe is automatically always better - there are good reasons for DOM-based banners, such as accessible operation or complex styling requirements. But it does mean that the vendor’s architectural decision has direct, measurable effects on web performance.
+
+And then there is another detail: what is actually measured when the CMP is active versus when it is not? For returning visitors who have already consented, no banner is shown. But the consent check and the setting of Consent Mode signals still happen. For first-time visitors, however, the banner potentially blocks interaction with the actual page. Performance tests that only measure the “banner already gone” state therefore tell at best half the story.
+
+GTM Template E-Book
+Custom templates for Server-Side GTM?
+
+Become a server-side tag manager pro - with self-developed templates for sGTM.
+Go to e-book →
+
+DebugBear and SpeedCurve have published some quite sobering analyses on this independently, and they are worth reading if performance is a topic. And let’s be honest: if you work with Google Ads, performance is always a topic. Anyone who looks at Search Console in the morning and sees what Core Web Vitals do to Quality Score knows this.
+
+### Checklist question
+
+How does the CMP render its banner (iframe or DOM)? What are the measured INP values when clicking Accept on an average mobile device? And does the vendor provide performance data at all, or do I have to measure it myself? If the latter: better before, not after... and not just “I had a quick look in Lighthouse” 😉
+
+## TCF payload: where does the consent string end up?
+
+This point is only relevant for those who use the IAB Transparency & Consent Framework - mainly publishers with programmatic advertising and shops with extensive vendor lists. Anyone who only needs Google Ads and Analytics can safely skip to the next point.
+
+TCF creates a so-called tcString for every consent decision: a Base64-encoded string that contains the consent status for every individual vendor and every purpose. With manageable vendor lists (20-30 partners), this is a few hundred bytes, no problem. With large publisher setups with 400+ vendors, however, this string becomes... bulky. And this is where the CMP implementation becomes relevant. Unfortunately, it is precisely the publishers who “depend” on TCF who rarely have just “a few entries” in this list. So the problem can be significant if you are one of those sites that make Ghostery glow when loaded.
+
+The key question: where does the CMP store this string? In a first-party cookie or in the browser’s localStorage?
+
+The distinction sounds petty, but it can have real impact. First-party cookies are sent by the browser to the server with every single HTTP request. For every image, every API call, every font download. If the TCF string is stored in a cookie and is several kilobytes in size, it bloats every request. Since a page - and we are talking about publishers here - often needs several hundred requests to load, this adds up dramatically. APIs, servers and CDNs have limits for HTTP header sizes (usually somewhere around 8 KB), and if the bloated cookie header exceeds this limit, the server responds with HTTP 431 “Request Header Fields Too Large.” The website collapses - not because anyone changed the code, but because the CMP wrote its consent string to the wrong place.
+
+Network view with large TCF strings in the payload
+Large TCF strings can make payloads a problem.
+
+If this does not happen, then a whole lot of TCF cookie content has simply been sent all over the place (and, of course, back to ourselves too), while only 2% of recipients are interested in it. At that point, carbon neutrality can only be achieved by buying indulgences from the Church of the Greenwashing Madonna.
+
+The better option: localStorage. Data in localStorage is not automatically sent to the server. Tags that need the TCF string (header bidding, programmatic) request it locally via the standardized `__tcfapi` JavaScript API. No bloated header, no 431 errors, no server problems. The CMP delivers the string specifically to the tags that need it, without burdening the rest of the website communication.
+
+The alternative is the risk of real outages, which have sometimes taken days to identify - because nobody had on their radar that a cookie that is too large can eventually cripple server infrastructure.
+
+### Checklist question, if TCF is relevant
+
+Where does the CMP store the TCF string - in a cookie or in localStorage? If cookie: is there a size limit or fallback?
+
+## Cross-domain consent: the promise the browser cannot keep
+
+“One-time opt-in across all your domains.” Sounds fantastic, especially for companies with multiple brands, shops or country domains. You consent once and the consent applies everywhere. You can probably guess: unfortunately, in the harsh modern browser landscape, it is not that simple.
+
+Cross-domain consent sharing usually works via linking through URL parameters, third-party cookies or localStorage workarounds in invisible iframes. And this is exactly where Apple (and increasingly Firefox too) has drawn a very thick line. Intelligent Tracking Prevention (ITP) in WebKit - the browser engine enforced on every iOS device, regardless of whether Safari, Chrome or Firefox is installed - blocks exactly these mechanisms. Other browsers, depending on privacy settings and/or installed plugins, also actively oppose them. Stripping parameters, refusing or partitioning cookies and browser storage... there are many ways to cause trouble here.
+
+What does this mean in practice? On iOS devices (depending on the market, easily up to 50% of traffic), cross-domain consent simply does not work. Users are asked for consent again on every domain, regardless of what they just confirmed on the sister domain. The fancy name for this is “consent loop” - and it is not only annoying for users, but can significantly reduce consent rates on subdomains because people eventually click “Reject” in frustration after being asked for the fifth time.
+
+Some vendors do communicate this honestly in their developer docs - but in the fine print, which you only find if you explicitly search for ITP limitations. This means the entire cross-domain consent topic is always shaky and incomplete. The situation is not getting better either, only more difficult. Which leads, in the “worst” case, to browser fingerprinting and hash tables at the CMP vendor, all in the name of data protection. Spot the problem?
+
+One final bitter note: not all CMPs manage consent in the context of the domain rather than the host. So if you operate shop.myshop.com and [www.myshop.com](http://www.myshop.com), regardless of whether cross-domain tracking works, you have to look closely at whether the CMP sets a cookie for .myshop.com or creates different cookies for each host. I have seen this several times, and in one case the vendor charges consent per host. Shameful, unnecessary and purely financially motivated: you have to like that kind of thing.
+
+Even if the cookie is set for all hosts of the domain, it is still not guaranteed that you will not be asked again when switching hosts. The reason may then be the browser’s stricter tracking protection, which does not fall for the cheap CNAME redirect for shop.myshop.com and creates its own version of the cookie there. You guessed it: unfortunately only after the banner is shown and a new decision is made.
+
+### Checklist question
+
+How does cross-domain consent work technically - and what happens on iOS/Safari? Is there honest documentation of the limitations? And what does your own setup look like? Cross-domain may already be required for cross-host - all parties should check. You can already look in advance at what happens to cookies created via JS if, for example, you fear falling into the CNAME trap.
+
+## GPC: the signal that is gaining weight
+
+Global Privacy Control is a relatively new standard in which the browser signals via an HTTP header (`Sec-GPC: 1`) or a JavaScript API (`navigator.globalPrivacyControl`) that the user does not want their data shared or sold. In California, GPC has already been incorporated into the “local GDPR” called CCPA/CPRA. Of course, the European discussion is also considering to what extent browser signals should be considered a legally valid opt-out... as everything in data protection is so often carefully discussed before decisions are made far away from practical reality.
+
+For CMP selection, this means: does the tool support GPC? And if so, what exactly does it do with it? Is the consent dialog adapted when GPC is detected? Are certain categories automatically set to “rejected”? Or is the signal simply ignored? And is the topic relevant to me?
+
+Depending on your website’s audience, ignoring it may otherwise increasingly become a compliance risk. Browsers such as Firefox and Brave have GPC enabled by default, and the share of users with an active GPC signal is growing. Anyone buying a CMP today that does not recognize GPC may be buying a problem for tomorrow.
+
+### Checklist question
+
+Does the CMP detect the GPC signal, and what happens concretely when it does?
+
+# Part 4: The uncomfortable truths
+
+## The uncomfortable truths
+
+What has come so far can still be asked in the sales process to some extent. The following points are, unfortunately, different. They concern things that often only become visible after months or years and are therefore not a topic in the sales conversation. I can therefore only report from clients’ tales of suffering and second-hand experiences. But that does not make the problems any less real.
+
+## Silent breakage: something is missing. You just do not know it yet.
+
+There is a particularly perfidious type of problem: something breaks without anyone having changed anything. No deployment, no new tag, no update to your own code. Still, overnight, tracking drops, tags stop firing, consent categories behave differently than yesterday. Welcome to the world of silent changes, which can lurk in many places.
+
+CMPs often maintain internal databases with predefined services, cookie mappings, vendor lists. These databases are updated - sometimes through automatic synchronization with the IAB Global Vendor List, sometimes by the CMP vendor itself, which “improves” its templates or expands the knowledge base. What this means in practice: a vendor changes its ID in the global list, the CMP adopts it automatically, and consent for that vendor suddenly stands at “Denied” because the old ID no longer exists.
+
+Sounds too unlikely? Then perhaps this case will convince you, which I have mainly experienced where communication between CMP and data layer is suboptimal: the provider changes the cookie format in which it stores consent decisions, and suddenly the Custom HTML tag that reads this cookie no longer works, because the DataLayer does not provide anything - or not everything - you need. The result here too is that tags wait in vain for a starting signal and are no longer executed.
+
+Another horror topic, which does not necessarily affect everyone but has already caused massive problems even with widely used CMPs, only noticed when someone sees a hole in the data or conversions stop appearing in the Ads account: the API changes. It is astonishing how little value some providers place on backward compatibility. They provide an API, publish new documentation somewhere, perhaps even send out a newsletter where the topic is one of five items, and then wonder why not every user migrated their API-connected solutions in time and is now bothering support. I did not invent this detail either, but went through it together with a client, with a well-known CMP.
+
+Just as annoying as renamed cookies or changed value structures are DataLayer events that suddenly have different names than before. Unfortunately, I can also back this up with my own experience. It does not happen often and not with every CMP. But if it hits your website, that is little consolation.
+
+### Checklist question
+
+Is there a changelog for changes to CMP configuration, service templates, the API and the cookie format? Will I be notified before a change goes live (and how)? Is there a staging environment where I can test updates before they affect all my websites, and how does versioning work? Some CMPs have real strengths here and offer frozen code states, cleanly separated versions for updates and a good possibility for controlled migration... but unfortunately these are rarely the same ones that pull the nasty tricks described here.
+
+## The audit-trail fairy tale
+
+Every CMP vendor likes to bring up a very special argument: server-side storage of consent history at the CMP provider is indispensable. Compliance, proof obligations, regulatory inquiries - without the audit trail on the server, you are lost. That sounds plausible. And it is the argument that often justifies the entire business model: no server component, no vendor; no vendor, no subscription; no subscription, no revenue - because what remains is “a piece of JavaScript” and a dialog. That is why there are also consent solutions that are not only self-hosted, but store consent and the history of consent in the browser. Without being able to judge the difference legally, from a purely technical perspective the delta seems very, very small to me.
+
+Let’s look at the details of how a history stored somewhere outside the browser works. The CMP creates a record “somewhere” for every consent decision. It contains, for example, timestamp, selected categories or tools, banner version, perhaps a device identifier. This record is stored on the provider’s server or on the web server of the visited site (for example, if using certain plugins for typical CMSs) and linked with a reference. This is typically a hash or an ID stored as a cookie, or possibly exclusively or redundantly in localStorage in the user’s browser. If the data protection authority asks “Did user X consent on day Y?” or the user themself has questions about their data and its lawful collection, the server record can be assigned to the user via the cookie ID and proof can be provided.
+
+But: how long does this cookie typically live? In Safari under ITP, first-party cookies set via JavaScript are cut off depending on the scenario after one day or at the latest after seven “browser-active” days without renewal through a visit to the same website. Or the user deletes their cookies, permanently switches browser, or changes device. In all these cases, the browser reference is gone, but the server record remains. Forever. Without a living counterpart in the wild and with little chance of ever contributing anything useful when answering a question. Technically speaking, then, the history directly in the browser, which presumably shares both the lifespan of the reference cookie and the current browser decisions as well as its end, would always be preferable to a poor orphaned row in a database. As I said: I am not a lawyer and cannot decide whether a server-side component is really to be found as a hard requirement in the letter of the law. But methods for hardening the consent cookie are certainly a good idea if you are paying the CMP vendor to feed all these dead records with storage space and CO2 until day X (retention periods for this? No idea).
+
+Hash tables full of dead records
+Tables full of consent decisions, but without any existing reference: valuable, expensive data garbage.
+
+I still like to call them “hash tables of death.” A conservative estimate: 96% ;) of the consent records on CMP vendors’ servers are dead entries. The hash still exists in the database, but the cookie that served as the key has long fallen victim to the natural transience of all browser persistence. These records cannot be deleted (because you cannot know whether the user might still return), cannot be assigned (because the counterpart is missing), and are therefore probably not as court-proof as they are sold to be. As the central reason for CMPs to exist, this seems thin to me. But be that as it may: the history has to be stored somewhere. So now...
+
+### Checklist question
+
+How does the audit trail work technically? Where is the history stored (CMP provider vs. your own database in WordPress, where the disk slowly fills up vs. perhaps in the browser after all)? How do I assign a server record to a specific user if the cookie no longer exists, and/or are there features for “self-disclosure” instead of asking the requester for their cookie values (as fun as that may be in individual cases)?
+
+## Dark patterns: when the tool makes it too easy
+
+There are CMPs that offer A/B testing for consent banners. Different texts, different colors, different button arrangements - all with the goal of optimizing the “consent rate.” In my opinion, this is also a very useful feature, because there are plenty of studies and case studies showing enormous uplifts.
+
+The problem starts where you may have too much freedom without at least having to actively ignore a warning before you banish the “Reject” button from the first layer and hide it behind a click on “Settings” or whatever. There is certainly room for visual design, which may be weighed in terms of risk management or cost/benefit, but some aspects have by now emerged as clear requirements, with fines threatening if they are not met. Even when keeping the button, you can quickly slide into “dark patterns” if you do it with a few clicks in the CMP backend and a good feeling. Because why else does this option or every template exist? Even without a fine, a lot of work and internal costs arise if you are once forced into correspondence with the responsible data protection supervisory authority.
+
+For CMP selection, the question is therefore: does the tool make it easy to implement dark patterns? And are there guardrails to prevent this? A tool that, in its default configuration, offers the Reject button in the same size and prominence as the Accept button sends a different signal than one that already comes by default with asymmetric buttons and only unlocks the “equivalent alternative” via configuration.
+
+### Checklist question
+
+What does the default banner configuration look like? Are Accept and Reject designed equivalently? Does the tool offer A/B testing - and if so, are there guardrails against dark patterns?
+
+## Exit strategy: what happens when you want to leave
+
+There are many reasons why you might want to change CMP. In the simplest case, you have had some plugin since 2018 that did something, and it has worked fine so far. Until data protection requirements from inside or outside become a focus, your Ads account suddenly stops, or you want to respond to rising costs by switching. Maybe cooperation with the CMP provider involves too much support effort, the API is too unreliable... I have already “had the pleasure” of accompanying every one of the reasons mentioned and the resulting changes from the outside.
+
+What happens in such a case with everything you have built up in the old tool over months or years?
+
+Extensive tracking setups
+Integrations of consent-dependent content on your own website
+Individual service configurations
+Texts coordinated with Legal in 12 languages
+Categories adapted to your own legal interpretation
+Design and template adjustments
+API integrations
+Reporting on consent rates
+
+Much of this is directly or indirectly tied to the vendor’s backend. But how do you take it with you? The sad answer is “manually” or “not at all.” There is no standard export format for CMP configurations, so in many respects you start from scratch (or have to rebuild things in parallel to prepare the switch).
+
+The biggest problem is probably the consent history with the old provider. The records, which for the reasons described in the previous section are mostly dead, must be migrated (if you can access them at all) or kept there, because you still need to be able to provide information. How long are they retained after contract termination, and at what cost?
+
+Some vendors make the switch more bearable and offer to import the consent status from the old system, so returning visitors are not asked again. This is technically possible (the old system’s cookie is still there, at least for some visitors). But it is not a standard and not something you can rely on without fixing it contractually - and usually you also have to pay for it; in the worst case on both sides.
+
+Especially the transition phase can be a problem even aside from the history. Where, for example, a scanner is the primary source for populating the new tool, which can only be deployed once all services are configured, you may end up in a deadly spiral. I am currently seeing this with a client who is switching from one renowned vendor to another. The happy new CMP provider has a scanner, but unfortunately it cannot bring cookies for scanning a page on which it needs cookies so the old CMP will deliver all services it is supposed to detect. For some time now, client, provider A and provider B have been passing the ball back and forth. IP addresses are sent to IT, parameters for calls by the scanner are tested and discarded, and in the end they will reach a point where 90% of the website has been crawled and everything that is delivered has been found. Except for the conversion tags hidden behind forms or a completed cart. Very few scanners are configurable flexibly enough to send them to all relevant pages of a domain with the correct configuration and payload. In this case, I am eagerly waiting to see how it continues.
+
+### Checklist question
+
+What can I export and what not? How long does my access remain after cancellation? Is there documented migration support for switching to another provider? And: what happens to my website during the transition phase - the moment when the old CMP is switched off and the new one is not yet fully set up? For the specific switch: how does the configuration of the new tool reach a state where the hard switch from old to new is possible without losses?
+
+# The distillation
+
+## The checklist
+
+If you have made it this far: respect. That was a lot of text and a lot of detail. But that is exactly the point - the reality of selecting a CMP cannot be squeezed into ten bullet points without leaving out everything that will really matter later.
+
+Still: here is an attempt at distillation. The following questions are the concentrate of everything above. They work as a questionnaire for the sales process, as a checklist for internal evaluation, or as a basis for a conversation with the service provider who will support the implementation. Not every question is equally relevant to every setup - but every single one originates in a real problem that has occurred somewhere at some point. You can assess what is relevant for your specific use case quite well from the details in the almost two meters of text above.
+
+## ⚙ Setup & Operations
+
+DataLayer events: How many events does the CMP fire into the DataLayer? Is there a single reliable “consent is established” event as the trigger basis, or do I have to construct the timing myself?
+
+Service configuration: How do I manually create a service that the system does not know? The killer test: create and categorize an unknown niche pixel.
+
+Service updates: How do I update existing services? Am I notified about changes to predefined templates? Do services without cookies work (localStorage, pixels, iframes)?
+
+CMP deployment: Is the CMP loaded directly in the HTML or via the tag manager? Can I bind the loading of the tag manager to a consent category? What does integration look like with server-side GTM or Tag Gateway?
+
+(Auto-)blocking: Is a blocker integrated? If there is a blocker: how does it work, and is it optional or a mandatory component?
+
+## 👤 Usability & everyday work
+
+Self-service: Can texts, languages and button designs be changed without the IT department? Or does every text change mean a developer ticket?
+
+Languages: How are new languages added? Do services need to be reconfigured per language? What happens if no language rule applies?
+
+Roles & permissions: How granular is the role concept? Can the legal department change texts without endangering the DataLayer configuration?
+
+Staging: Is there a test or staging environment for changes before they go live?
+
+## € Pricing
+
+Volume metric: sessions, MAUs, hits or consent decisions? How exactly is the metric defined? Are bots counted?
+
+Estimation: How do I get a reliable estimate of my volume in the respective metric?
+
+Exceeding limits: What happens technically and commercially if limits are exceeded? Banner gone, auto-upgrade or goodwill?
+
+## ⚡ Architecture & performance
+
+INP & rendering: How does the CMP render the banner (iframe, DOM, Shadow DOM)? What INP values are measured when clicking Accept - on real mobile devices, not just in Lighthouse?
+
+TCF storage, if relevant: Where does the TCF string end up - cookie or localStorage? If cookie: is there a size limit?
+
+Cross-domain consent: How does it work technically and what happens on iOS/Safari/WebKit? Check host vs. domain - is the cookie set for the entire domain or per host?
+
+GPC: Does the CMP detect the Global Privacy Control signal, and what happens then concretely?
+
+## 🔄 Stability & change management
+
+Changelog: Is there a documented changelog for changes to templates, API, cookie format and DataLayer events?
+
+Notification: Will I be warned before breaking changes - and how?
+
+Versioning: Can I run a frozen version and plan the migration in a controlled way?
+
+## 🛡 Compliance & audit
+
+Audit trail: Where is the consent history stored (with the vendor, on your own server, in the browser)? How do I assign a record to a user if the cookie no longer exists?
+
+Self-disclosure: Are there functions that allow users to view their own consent history without me, as the operator, having to ask for cookie values?
+
+Dark patterns: What does the default configuration look like? Are Accept and Reject designed equivalently? Are there guardrails for A/B tests?
+
+## 🚪 Exit & migration
+
+Export: What can I export - configuration, texts, consent history? In what format?
+
+Consent import: Does the new provider offer import of consent status from the old system?
+
+Transition phase: How do I ensure that the new CMP knows all services before the hard switch takes place? How flexible is the scanner for pages behind login, forms or carts?
+
+After cancellation: How long does access remain? What happens to the stored consent history and at what cost?
+
+If you are into that kind of thing: NotebookLM made an infographic version of the CMP checklist from this post. I think it is okay, but who needs that? 😉
+
+# Closing remarks
+
+This list is not complete. It cannot be, because every setup is different and every organization has its own priorities. What is existential for a publisher with 500 vendors and TCF may be irrelevant for a mid-sized online shop with three tracking tags and a contact form. And vice versa.
+
+But hopefully this list shows one thing: the questions that really determine the day-to-day usability of a CMP are not found in glossy brochures and are not answered in webinars. They arise from experience, from mistakes and from the moment when you are sitting in front of your computer for the third time at 10 p.m., trying to find out why no conversions have been coming in since yesterday, even though you absolutely did not change anything yourself.
+
+Remember: those who ask the right questions get more helpful answers. Or at least an informative silence 🙂 I can only wish you the best of luck if you are facing such a migration, and I hope this very, very, very detailed instruction manual for the “somewhat different CMP checklist” helps you make an informed decision. Because in the end, that is what consent management is all about too!

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "google-analytics",
+    "name": "Google Analytics",
+    "category": "analytics",
+    "patterns": ["_ga", "_gid", "_gat*", "_ga_*"],
+    "description": "Used to distinguish users and throttle request rate."
+  },
+  {
+    "id": "google-ads",
+    "name": "Google Ads",
+    "category": "marketing",
+    "patterns": ["_gcl_aw", "_gcl_dc", "_gac*", "_gcl_au"],
+    "description": "Used for conversion tracking and remarketing."
+  },
+  {
+    "id": "facebook-pixel",
+    "name": "Meta Pixel",
+    "category": "marketing",
+    "patterns": ["_fbp", "_fbc"],
+    "description": "Used for advertisement tracking and optimization."
+  },
+  {
+    "id": "linkedin-insight",
+    "name": "LinkedIn Insight",
+    "category": "marketing",
+    "patterns": ["li_sugr", "bcookie", "UserMatchHistory", "lidc", "lms_ads", "lms_analytics"],
+    "description": "Used for LinkedIn conversion tracking."
+  },
+  {
+    "id": "microsoft-clarity",
+    "name": "Microsoft Clarity",
+    "category": "analytics",
+    "patterns": ["_clck", "_clsk", "CLID", "anon_id", "MR", "MUID"],
+    "description": "Used to store and track audience reach and behavioral analytics."
+  },
+  {
+    "id": "own-cmp",
+    "name": "Own CMP",
+    "category": "necessary",
+    "patterns": ["owncmp_consent*"],
+    "description": "Stores user consent preferences."
+  }
+]

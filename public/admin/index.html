@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Own CMP Admin</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+  </head>
+  <body>
+    <main id="login-view" class="login-shell" hidden>
+      <form id="login-form" class="login-panel">
+        <div>
+          <p class="eyebrow">Own CMP</p>
+          <h1>Admin login</h1>
+        </div>
+        <label>
+          Email
+          <input name="email" type="email" value="admin@example.com" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" value="change-me-now" autocomplete="current-password" required>
+        </label>
+        <p id="login-warning" class="notice warning" hidden>Default credentials are active.</p>
+        <p id="login-error" class="notice danger" hidden></p>
+        <button class="button primary" type="submit">Sign in</button>
+      </form>
+    </main>
+
+    <main id="app-view" class="app-shell" hidden>
+      <input type="file" id="import-input" accept=".json" hidden>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Own CMP</p>
+          <h1 id="site-heading">Consent workspace</h1>
+        </div>
+        <div class="topbar-actions">
+          <div id="user-info" style="font-size: 13px; text-align: right; margin-right: 10px;">
+            <div id="user-email" style="font-weight: 700;">-</div>
+          </div>
+          <span id="save-state" class="save-state">Saved</span>
+          <button id="save-button" class="button">Save draft</button>
+          <button id="publish-button" class="button primary">Publish</button>
+          <button id="logout-button" class="button subtle">Logout</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <button class="nav-item active" data-panel="overview">Overview</button>
+          <button class="nav-item" data-panel="banner">Banner</button>
+          <button class="nav-item" data-panel="consent">Consent</button>
+          <button class="nav-item" data-panel="services">Services</button>
+          <button class="nav-item" data-panel="history">History</button>
+          <button class="nav-item" data-panel="scanner">Scanner</button>
+          <button class="nav-item" data-panel="snippets">Snippets</button>
+        </aside>
+
+        <section class="content">
+          <section id="panel-overview" class="panel active">
+            <div class="section-head">
+              <div>
+                <h2>Overview</h2>
+                <p>Current production state and runtime contract.</p>
+              </div>
+              <div class="topbar-actions">
+                <button id="export-button" class="button subtle">Export JSON</button>
+                <button id="import-button" class="button subtle">Import JSON</button>
+                <a class="button subtle" href="/demo.html" target="_blank" rel="noreferrer">Open demo</a>
+              </div>
+            </div>
+            <div class="metric-grid">
+              <div class="metric">
+                <span>Site ID</span>
+                <strong id="metric-site-id">-</strong>
+              </div>
+              <div class="metric">
+                <span>Version</span>
+                <strong id="metric-version">-</strong>
+              </div>
+              <div class="metric">
+                <span>Published</span>
+                <strong id="metric-published">-</strong>
+              </div>
+              <div class="metric">
+                <span>Runtime</span>
+                <strong>Vanilla JS</strong>
+              </div>
+            </div>
+            <div class="runtime-contract">
+              <h3>dataLayer event</h3>
+              <pre id="event-preview"></pre>
+            </div>
+            <div class="runtime-contract">
+              <h3>Pending publish diff</h3>
+              <div id="publish-diff" class="diff-list"></div>
+            </div>
+          </section>
+
+          <section id="panel-banner" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Banner</h2>
+                <p>Text, colors, and first-layer actions.</p>
+              </div>
+            </div>
+            <form id="banner-form" class="form-grid">
+              <label>
+                Site name
+                <input name="siteName" type="text" maxlength="120">
+              </label>
+              <label>
+                Site ID
+                <input name="siteId" type="text" pattern="[A-Za-z0-9_-]+" maxlength="80">
+              </label>
+              <label class="span-2">
+                Title
+                <input name="banner.title" type="text" maxlength="120">
+              </label>
+              <label class="span-2">
+                Body
+                <textarea name="banner.body" rows="4" maxlength="500"></textarea>
+              </label>
+              <label>
+                Accept text
+                <input name="banner.acceptAllText" type="text" maxlength="60">
+              </label>
+              <label>
+                Reject text
+                <input name="banner.rejectAllText" type="text" maxlength="60">
+              </label>
+              <label>
+                Preferences text
+                <input name="banner.preferencesText" type="text" maxlength="60">
+              </label>
+              <label>
+                Save text
+                <input name="banner.saveText" type="text" maxlength="60">
+              </label>
+              <label>
+                Background
+                <input name="banner.theme.background" type="color">
+              </label>
+              <label>
+                Text
+                <input name="banner.theme.text" type="color">
+              </label>
+              <label>
+                Primary
+                <input name="banner.theme.primary" type="color">
+              </label>
+              <label>
+                Neutral
+                <input name="banner.theme.neutral" type="color">
+              </label>
+            </form>
+          </section>
+
+          <section id="panel-consent" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Consent</h2>
+                <p>Categories and Google Consent Mode v2 mapping.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Required</th>
+                    <th>Default</th>
+                    <th>Google signals</th>
+                  </tr>
+                </thead>
+                <tbody id="category-rows"></tbody>
+              </table>
+            </div>
+            <div class="settings-row">
+              <label class="switch-row">
+                <input id="gpc-enabled" type="checkbox">
+                Detect GPC
+              </label>
+              <label>
+                Consent cookie days
+                <input id="consent-ttl" type="number" min="1" max="730">
+              </label>
+              <label>
+                dataLayer event
+                <input id="datalayer-event" type="text" maxlength="80">
+              </label>
+            </div>
+
+            <div class="section-head" style="margin-top: 2rem;">
+              <div>
+                <h2>Regional Overrides</h2>
+                <p>Specific Consent Mode defaults for different regions (e.g. EEA).</p>
+              </div>
+              <button id="add-override-button" class="button">Add override</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Display Name</th>
+                    <th>Regions (ISO)</th>
+                    <th>Signals</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="regional-rows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="panel-services" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Services</h2>
+                <p>Manual services, categories, and cleanup cookies.</p>
+              </div>
+              <button id="add-service-button" class="button">Add service</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Enabled</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Cookies</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="service-rows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="panel-history" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>History</h2>
+                <p>Published versions and rollback controls.</p>
+              </div>
+              <button id="refresh-history-button" class="button">Refresh</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Version</th>
+                    <th>Published</th>
+                    <th>Active since</th>
+                    <th>Services</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="history-rows"></tbody>
+              </table>
+            </div>
+            <h3>Version preview</h3>
+            <pre id="version-preview">Select a version to inspect it.</pre>
+          </section>
+
+          <section id="panel-scanner" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Active Cookie Scanner</h2>
+                <p>Run a tiny script on your website to identify cookies and suggest services.</p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>1. Copy the Scanner Script</h3>
+              <p>Visit your live website, open the browser console (F12), paste this script and press Enter.</p>
+              <pre id="scanner-script-copy" style="background: #f1f5f9; padding: 12px; border-radius: 6px; cursor: pointer; color: #334155; font-size: 12px;">(function(){const c=document.cookie.split(";").map(p=>p.trim().split("=")[0]);alert("Scan complete! Check console for results.");console.log(JSON.stringify({cookies:c,url:location.href}));})();</pre>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+              <h3>2. Paste Scan Results</h3>
+              <p>Paste the JSON string from your console output below.</p>
+              <textarea id="scanner-input" placeholder='{"cookies":["_ga", "_fbp"], "url":"..."}' style="width: 100%; height: 100px; font-family: monospace; padding: 10px; border: 1px solid var(--border); border-radius: 6px;"></textarea>
+              <div class="topbar-actions" style="margin-top: 10px; justify-content: flex-end;">
+                <button id="process-scan-button" class="button primary">Analyze Cookies</button>
+              </div>
+            </div>
+
+            <div id="scanner-results" style="margin-top: 2rem;"></div>
+          </section>
+
+          <section id="panel-snippets" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Snippets</h2>
+                <p>Website install code and GTM trigger basis.</p>
+              </div>
+            </div>
+            <h3>Website script</h3>
+            <pre id="script-snippet"></pre>
+            <h3>Website script when using the GTM bridge</h3>
+            <pre id="gtm-script-snippet"></pre>
+            <h3>GTM custom event</h3>
+            <pre id="gtm-snippet"></pre>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script src="/admin/app.js" defer></script>
+  </body>
+</html>

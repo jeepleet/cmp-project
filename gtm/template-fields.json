@@ -1,0 +1,111 @@
+{
+  "templateName": "Own CMP Consent Mode Bridge",
+  "tagType": "web",
+  "recommendedTrigger": "Consent Initialization - All Pages",
+  "fields": [
+    {
+      "name": "region",
+      "type": "text",
+      "displayName": "Region codes",
+      "help": "Optional ISO 3166-2 region list, comma-separated. Leave blank for global defaults."
+    },
+    {
+      "name": "waitForUpdateMs",
+      "type": "number",
+      "displayName": "wait_for_update milliseconds",
+      "defaultValue": 500
+    },
+    {
+      "name": "ad_storage",
+      "type": "select",
+      "displayName": "Default ad_storage",
+      "options": ["denied", "granted"],
+      "defaultValue": "denied"
+    },
+    {
+      "name": "ad_user_data",
+      "type": "select",
+      "displayName": "Default ad_user_data",
+      "options": ["denied", "granted"],
+      "defaultValue": "denied"
+    },
+    {
+      "name": "ad_personalization",
+      "type": "select",
+      "displayName": "Default ad_personalization",
+      "options": ["denied", "granted"],
+      "defaultValue": "denied"
+    },
+    {
+      "name": "analytics_storage",
+      "type": "select",
+      "displayName": "Default analytics_storage",
+      "options": ["denied", "granted"],
+      "defaultValue": "denied"
+    },
+    {
+      "name": "functionality_storage",
+      "type": "select",
+      "displayName": "Default functionality_storage",
+      "options": ["denied", "granted"],
+      "defaultValue": "granted"
+    },
+    {
+      "name": "personalization_storage",
+      "type": "select",
+      "displayName": "Default personalization_storage",
+      "options": ["denied", "granted"],
+      "defaultValue": "denied"
+    },
+    {
+      "name": "security_storage",
+      "type": "select",
+      "displayName": "Default security_storage",
+      "options": ["denied", "granted"],
+      "defaultValue": "granted"
+    },
+    {
+      "name": "adsDataRedaction",
+      "type": "select",
+      "displayName": "Ads data redaction",
+      "options": ["inherit", "true", "false"],
+      "defaultValue": "inherit"
+    },
+    {
+      "name": "urlPassthrough",
+      "type": "select",
+      "displayName": "URL passthrough",
+      "options": ["inherit", "true", "false"],
+      "defaultValue": "inherit"
+    }
+  ],
+  "permissions": [
+    {
+      "permission": "access_consent",
+      "access": "write",
+      "types": [
+        "ad_storage",
+        "ad_user_data",
+        "ad_personalization",
+        "analytics_storage",
+        "functionality_storage",
+        "personalization_storage",
+        "security_storage"
+      ]
+    },
+    {
+      "permission": "access_globals",
+      "access": "execute",
+      "keys": ["OwnCMP.onReady", "OwnCMP.onChange"]
+    },
+    {
+      "permission": "access_globals",
+      "access": "write",
+      "keys": ["OwnCMPGtmBridge"]
+    },
+    {
+      "permission": "write_data_layer",
+      "notes": "Needed indirectly by Google consent APIs and gtagSet in GTM."
+    }
+  ]
+}

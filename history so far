@@ -1,0 +1,434 @@
+Plan free CMP project
+No tasks in progress
+
+
+That makes sense. I also want the CMP to be lightweight and super fast loading times.
+
+Lets start the project
+9:55 AM
+
+
+Worked for 9m 57s
+Started the project as a lightweight, dependency-free Node app.
+
+Run it with:
+
+node src/server/index.js
+Then open:
+
+Admin: http://localhost:8787/admin/
+Demo: http://localhost:8787/demo.html
+Default login:
+
+admin@example.com
+change-me-now
+What’s in place:
+
+Native Node backend with login/session handling
+Vanilla admin UI for banner, categories, services, snippets, and publishing
+Public config endpoint
+Vanilla CMP runtime at public/cmp/owncmp.js
+Consent Mode v2 defaults and update flow
+Stable owncmp.consent_ready dataLayer event
+No cookie deletion until explicit denial
+Docs in README.md, architecture.md, and roadmap.md
+Verified:
+
+JS syntax checks passed
+Admin, demo page, runtime script, and public config returned 200
+Login and publish API flow worked
+I verified the server through a temporary local process. This tool environment does not keep background processes alive after the command session ends, so start it locally with the command above. Next practical step is adding a proper config version history screen and the GTM custom template.
+
+
+README.md
+Document · MD
+Open
+
+
+architecture.md
+Document · MD
+Open
+
+
+roadmap.md
+Document · MD
+Open
+
+15 files changed
++2347
+-2
+Undo
+
+Review
+
+.gitignore
+README.md
+docs/architecture.md
+docs/roadmap.md
+package.json
+public/admin/app.js
+public/admin/index.html
+public/admin/styles.css
+public/cmp/owncmp.js
+public/demo.html
+src/server/auth.js
+src/server/index.js
+src/server/storage.js
+.gitignore
+public/cmp/owncmp.js
+
+
+
+
+10:05 AM
+so what is next? guide me
+10:09 AM
+
+Next, validate the skeleton manually, then we harden the core runtime before adding big features.
+
+Do This First
+
+Start the app:
+node src/server/index.js
+Open:
+http://localhost:8787/admin/
+Login:
+
+admin@example.com
+change-me-now
+In the admin:
+Change banner text
+Add or enable a service like GA4
+Publish
+Open http://localhost:8787/demo.html
+Test Accept, Reject, Preferences, Reset consent
+Watch the dataLayer output on the demo page
+For local security, run with your own credentials:
+$env:CMP_ADMIN_EMAIL="your@email.com"
+$env:CMP_ADMIN_PASSWORD="a-long-random-password"
+node src/server/index.js
+Recommended Build Order
+I would build the next pieces in this order:
+
+Config version history + rollback
+Every publish should create an immutable version you can inspect and restore.
+
+Config diff before publishing
+Show exactly what changed: banner text, services, categories, Google signals.
+
+GTM custom template
+This is critical for real-world adoption because many users will install through GTM.
+
+Runtime test suite
+Tests for:
+
+first visit
+stored consent
+accept all
+reject all
+preferences
+no cookie deletion before explicit denial
+GPC detected
+Performance budget
+Measure runtime size and load behavior. The CMP script should stay framework-free and small.
+
+Import/export
+Users should never be trapped. Full JSON export should be a first-class feature.
+
+My Recommendation
+Next task should be version history + rollback. That gives the project the right foundation: no silent changes, no accidental production breakage, and a clean publish workflow. After that, build the GTM template.
+
+
+
+
+
+10:09 AM
+1. guide me here. I just opened powershell terminal
+10:10 AM
+
+Do this in PowerShell.
+
+cd "C:\GTM Custom Templates\Own CMP Project"
+node src/server/index.js
+You should see:
+
+Own CMP running on http://localhost:8787
+Admin: http://localhost:8787/admin/
+Demo:  http://localhost:8787/demo.html
+Leave that PowerShell window open. The server is running in it.
+
+Now open your browser and go to:
+
+http://localhost:8787/admin/
+Login with:
+
+admin@example.com
+change-me-now
+Then:
+
+Go to Banner
+Change some text
+Click Save draft
+Click Publish
+Open:
+http://localhost:8787/demo.html
+Test:
+
+Accept all
+Reject all
+Preferences
+Reset consent
+To stop the server later, go back to PowerShell and press:
+
+Ctrl + C
+If port 8787 is already busy, run:
+
+$env:PORT=8788
+node src/server/index.js
+Then use:
+
+http://localhost:8788/admin/
+Paste any error you see if it does not start.
+
+
+
+
+
+10:10 AM
+ok i did it all. Tested it and shut it down again. Lets continue
+10:15 AM
+
+
+Worked for 4m 53s
+I continued with the publish safety layer.
+
+Added:
+
+Publish history snapshots under data/published/:siteId/versions/:environment/:version.json
+Backend APIs for:
+listing versions
+loading one version
+rolling back to a version
+New History tab in the admin
+Version preview JSON
+Restore button for rollback
+Pending publish diff in Overview
+Docs updated in README.md and architecture.md
+I preserved your admin changes: JeppesKaffe and cmp.consent_ready.
+
+Verified:
+
+Admin: 200
+Login: OK
+Version list: OK
+Version load: OK
+JS syntax checks: OK
+Now start it again:
+
+cd "C:\GTM Custom Templates\Own CMP Project"
+node src/server/index.js
+Then open:
+
+http://localhost:8787/admin/
+Check:
+
+Overview: change something and confirm the publish diff appears.
+Publish: publish the change.
+History: verify the new version appears.
+View: inspect a version.
+Restore: test rollback to an older version after you have at least two versions.
+Next meaningful step after you test this: build the GTM custom template, because that is the bridge from “working demo” to “usable CMP for real GTM setups.”
+
+
+README.md
+Document · MD
+Open
+
+
+architecture.md
+Document · MD
+Open
+
+9 files changed
++416
+-13
+Undo
+
+Review
+
+src/server/storage.js
+src/server/index.js
+public/admin/index.html
+public/admin/app.js
+public/admin/styles.css
+data/config.json
+data/published/demo-site/production.json
+README.md
+docs/architecture.md
+
+
+
+
+10:20 AM
+Btw, we ALWAYS need to document when we make changes, and where we are in the process , and what features we currently have etc etc. Always documentation ok ?
+10:22 AM
+
+
+Worked for 24s
+Yes. I added that rule to the project docs.
+
+New docs:
+
+status.md tracks where we are, current features, current local config, completed milestones, and next milestone.
+changelog.md records what changed and when.
+README.md now links the project docs and states the documentation rule.
+Going forward, every meaningful change should update docs in the same work session:
+
+docs/status.md for current state/features/next steps
+docs/changelog.md for behavior or file changes
+README.md for setup or usage changes
+architecture/roadmap docs when direction changes
+
+README.md
+Document · MD
+Open
+
+
+changelog.md
+Document · MD
+Open
+
+
+status.md
+Document · MD
+Open
+
+3 files changed
++100
+-0
+Undo
+
+Review
+
+README.md
+docs/changelog.md
+docs/status.md
+
+
+
+
+10:22 AM
+seems like it works. Lets continue
+10:29 AM
+
+
+Worked for 3m 5s
+Continued with the GTM milestone.
+
+Added:
+
+GTM bridge source pack in gtm/README.md
+GTM template code in own-cmp-consent-mode-template-code.js
+Template fields/permissions spec in template-fields.json
+Runtime support for data-google-consent="false" in owncmp.js
+Runtime-to-GTM callback bridge via window.OwnCMPGtmBridge
+Admin Snippets panel now shows a GTM-specific install snippet
+Docs updated: README.md, architecture.md, status.md, changelog.md
+Verified:
+
+Runtime JS syntax: OK
+Admin JS syntax: OK
+GTM template code syntax: OK
+template-fields.json: OK
+Admin endpoint: 200
+Runtime endpoint: 200
+Important: this is currently a GTM source pack, not yet an importable .tpl file. Next step is to turn it into an actual GTM custom template inside the GTM editor, add unit tests there, export the .tpl, then store that export in the repo.
+
+Official docs used:
+
+https://developers.google.com/tag-platform/tag-manager/templates/consent-apis
+https://developers.google.com/tag-platform/tag-manager/templates/permissions
+
+README.md
+Document · MD
+Open
+
+
+README.md
+Document · MD
+Open
+
+
+architecture.md
+Document · MD
+Open
+
+
+changelog.md
+Document · MD
+Open
+
+
+status.md
+Document · MD
+Open
+
+10 files changed
++333
+-10
+Undo
+
+Review
+
+public/cmp/owncmp.js
+gtm/README.md
+gtm/own-cmp-consent-mode-template-code.js
+gtm/template-fields.json
+public/admin/index.html
+public/admin/app.js
+README.md
+docs/architecture.md
+docs/changelog.md
+docs/status.md
+
+
+
+
+10:32 AM
+
+
+
+
+
+Default permissions
+
+5.5
+High
+
+IDE context
+
+
+Work locally
+
+Progress
+Review current project docs and runtime contract
+Add GTM template artifact and docs
+Update status and changelog
+Run validation checks
+
+Artifacts
+
+README.md
+
+README.md
+
+architecture.md
+
+changelog.md
+
+status.md
+
+roadmap.md
+
+Sources
+Web search

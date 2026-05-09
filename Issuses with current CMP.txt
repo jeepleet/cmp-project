@@ -1,0 +1,19 @@
+I would like to request an option to delay cookie deletion until a user has explicitly denied consent, instead of deleting cookies immediately on script load when no prior consent exists.
+The current behavior creates significant issues for both compliance and business performance, and is a major blocker for adopting cookie-script.com.
+Why this is important:
+1) New installations perge all excisting cookies
+When implementing cookie-script.com on a site that previously had no CMP, all existing cookies are deleted on the first visit before the user has a chance to provide consent. 
+This results in a full reset of tracking and loss of historical data.
+2) CMP migrations reset tracking
+When migrating from another CMP, existing consent is not preserved, and all cookies are deleted on the first visit.
+This again causes a complete reset of tracking.
+3) Unintentional deletion of long-lived cookies
+When the consent cookie expires (e.g., after 30 days), all other cookies are also deleted even those with longer lifetimes, such as Google Analytics cookies (up to 400 days).
+This leads to unnecessary data loss and degraded measurement quality.
+4) Premature deletion reduces effectiveness
+Deleting cookies on script load may happen before some cookies are even set, reducing the effectiveness of the cleanup.
+Delaying deletion increases the likelihood that cookies are properly handled according to the user’s final choice.
+Proposed solution
+Only delete cookies after the user has explicitly denied consent
+If valid consent already exists, continue handling cookies as currently implemented
+Do not delete cookies on initial load when no consent decision has yet been made

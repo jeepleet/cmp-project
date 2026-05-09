@@ -1,0 +1,31 @@
+[
+  {
+    "id": "43ja5neh",
+    "type": "config.published",
+    "details": {
+      "siteId": "demo-site",
+      "environment": "production",
+      "version": "20260508T165641Z"
+    },
+    "createdAt": "2026-05-08T16:56:41.692Z"
+  },
+  {
+    "id": "iudw2uao",
+    "type": "config.saved",
+    "details": {
+      "siteId": "demo-site",
+      "version": "20260508T165455Z"
+    },
+    "createdAt": "2026-05-08T16:56:28.300Z"
+  },
+  {
+    "id": "w69jeykd",
+    "type": "config.published",
+    "details": {
+      "siteId": "demo-site",
+      "environment": "production",
+      "version": "20260508T165455Z"
+    },
+    "createdAt": "2026-05-08T16:54:55.775Z"
+  }
+]
