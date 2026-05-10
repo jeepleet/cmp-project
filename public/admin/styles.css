@@ -116,6 +116,18 @@ button {
   justify-content: flex-end;
 }
 
+.site-picker {
+  min-width: 220px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.site-picker select {
+  min-height: 38px;
+}
+
 .save-state {
   color: var(--muted);
   font-size: 13px;
@@ -375,6 +387,63 @@ td .compact {
   align-items: end;
 }
 
+.period-picker {
+  min-width: 160px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.report-metric small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.report-bar {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 70px;
+  gap: 12px;
+  align-items: center;
+}
+
+.report-bar-track {
+  height: 12px;
+  overflow: hidden;
+  background: #eef2f6;
+  border-radius: 999px;
+}
+
+.report-bar-fill {
+  min-width: 2px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.report-bar.reject .report-bar-fill {
+  background: var(--danger);
+}
+
+.report-bar.partial .report-bar-fill {
+  background: var(--focus);
+}
+
+.report-bar.ignore .report-bar-fill {
+  background: var(--warning);
+}
+
 .switch-row {
   display: flex;
   align-items: center;
@@ -499,10 +568,16 @@ td .compact {
   }
 
   .metric-grid,
+  .report-grid,
   .form-grid,
   .settings-row,
   .diff-row {
     grid-template-columns: 1fr;
+  }
+
+  .report-bar {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .span-2 {

@@ -10,6 +10,6 @@
     "build:gtm": "node src/server/build-gtm.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=25"
   }
 }

@@ -1,0 +1,4 @@
+Own CMP running on http://localhost:8787
+Admin: http://localhost:8787/admin/
+Demo:  http://localhost:8787/demo.html
+Using default login admin@example.com / change-me-now

@@ -27,25 +27,45 @@ $env:CMP_ADMIN_PASSWORD="a-long-random-password"
 node src/server/index.js
 ```
 
+## Storage
+
+Own CMP now uses SQLite by default:
+
+```text
+data/owncmp.sqlite
+```
+
+On first startup, existing local JSON data is imported into SQLite once. The old JSON files remain as migration/source backups, but normal reads and writes use SQLite.
+
+Requirements:
+
+- Node.js 25 or newer for native `node:sqlite`
+- Optional local fallback: set `$env:CMP_STORAGE="json"` before starting the server
+
 ## Current Scope
 
 This first version is dependency-free on purpose:
 
 - Native Node backend with cookie sessions
+- SQLite storage by default with one-time JSON migration
 - Vanilla admin UI
 - Vanilla CMP runtime at `public/cmp/owncmp.js`
 - Versioned publish endpoint
 - Publish history and rollback
 - Publish diff in the admin overview
+- Multi-site admin selection and site creation
+- Site-scoped draft configs
+- Consent Reporting Dashboard with accept, reject, partial, ignore, and custom date-range metrics
 - Import/export JSON
 - Region-specific Consent Mode overrides
 - Runtime Test Lab
 - Public site changelog endpoint
+- Site-scoped reporting endpoint
 - GPC support resource at `/.well-known/gpc.json`
 - GTM Consent Mode bridge source pack and generated `.tpl`
 - WordPress and Shopify integration guides
 - Performance Lab and real-time INP dashboard
-- (In Progress) Phase 5: Multi-site support and durability
+- (In Progress) Phase 5: durable storage and operational insights
 - Public config endpoint
 - Demo page
 
@@ -56,6 +76,7 @@ The runtime does not delete cookies on first load. Cookie cleanup only runs afte
 - Current status: `docs/status.md`
 - Changelog: `docs/changelog.md`
 - Architecture: `docs/architecture.md`
+- Durable storage: `docs/durable-storage.md`
 - Roadmap: `docs/roadmap.md`
 - GTM bridge: `gtm/README.md`
 - GTM verification: `docs/gtm-verification.md`

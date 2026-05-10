@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-05-10
+
+### Added
+
+- Phase 5 multi-site foundation with a site index at `data/sites/index.json`.
+- Site-scoped draft config storage at `data/sites/:siteId/config.json`.
+- Authenticated site listing API: `GET /api/sites`.
+- Authenticated site creation API: `POST /api/sites`.
+- Site-scoped admin config API: `GET /api/config/:siteId` and `PUT /api/config/:siteId`.
+- Admin site selector and new-site creation flow with optional cloning from the current site.
+- Unsaved-change guard when switching sites or creating a new site.
+- Site-scoped Consent Reporting Dashboard in Admin.
+- Reporting period selector for the last 7, 30, 90, or 365 days.
+- Custom reporting date range selector.
+- Consent reporting API: `GET /api/reports/consent/:siteId?days=30`.
+- Consent reporting API support for `from=YYYY-MM-DD&to=YYYY-MM-DD`.
+- Runtime `banner_shown` records so no-interaction/ignore behavior can be measured.
+- Decision action labels for `accept_all`, `reject_all`, and `save_choices` records.
+- SQLite storage driver using `data/owncmp.sqlite`.
+- One-time JSON-to-SQLite migration for existing local project data.
+- JSON fallback mode via `CMP_STORAGE=json`.
+- Durable storage documentation in `docs/durable-storage.md`.
+
+### Changed
+
+- Admin draft loading and saving now uses the selected site instead of the legacy single `data/config.json` file.
+- Preview public config requests now return the requested site's draft config instead of always returning the default draft.
+- `data/config.json` remains as a compatibility mirror for `demo-site`.
+- Updated README, architecture, roadmap, and status docs for Phase 5 multi-site support.
+- Reporting headline metrics use latest decision per generated consent ID. Ignore is calculated from banner views without a matching decision in the selected period.
+- Reporting percentages now use tracked outcomes as the denominator instead of banner views, preventing legacy decision records from showing rates above 100%.
+- Storage now defaults to SQLite instead of local JSON files.
+- Node engine requirement changed to Node.js 25+ because the SQLite driver uses native `node:sqlite`.
+
 ## 2026-05-08
 
 ### Added
@@ -68,5 +102,4 @@
 
 ### Notes
 
-- Current project stage is early Phase 4.
-- Next recommended work is manual GTM `.tpl` verification, then server-side consent records.
+- Superseded by the 2026-05-10 Phase 5 multi-site entry above.

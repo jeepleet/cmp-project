@@ -2,6 +2,7 @@
 
 ## General Principles
 - **Dependency-Free:** Prioritize native Node.js modules and vanilla JavaScript. Avoid adding NPM packages unless strictly necessary.
+- **Storage:** Default storage is native SQLite via `node:sqlite`; JSON mode is only a local fallback with `CMP_STORAGE=json`.
 - **Documentation First:** Every meaningful project change must update the documentation in the same work session.
 - **Visual & Functional:** Prototypes must be visually appealing and substantially complete.
 

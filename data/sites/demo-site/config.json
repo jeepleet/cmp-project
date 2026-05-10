@@ -1,0 +1,177 @@
+{
+  "siteId": "demo-site",
+  "siteName": "Demo Site",
+  "environment": "production",
+  "schemaVersion": 1,
+  "version": "20260508T165641Z",
+  "lastPublishedAt": "2026-05-08T16:56:41.632Z",
+  "lastActivatedAt": "2026-05-08T16:56:41.632Z",
+  "consentCookieName": "owncmp_consent",
+  "consentTtlDays": 180,
+  "banner": {
+    "title": "Privacy choices",
+    "body": "We use cookies and similar technologies for analytics, marketing, and personalization. Choose what you allow.",
+    "acceptAllText": "Accept all",
+    "rejectAllText": "Reject all",
+    "preferencesText": "Preferences",
+    "saveText": "Save choices",
+    "closeText": "Close",
+    "position": "bottom",
+    "language": "en",
+    "theme": {
+      "background": "#d71d1d",
+      "text": "#1d1f24",
+      "border": "#d9dee7",
+      "primary": "#0f766e",
+      "neutral": "#374151"
+    }
+  },
+  "googleConsentMode": {
+    "enabled": true,
+    "mode": "advanced",
+    "waitForUpdateMs": 500,
+    "defaultState": {
+      "ad_storage": "denied",
+      "ad_user_data": "denied",
+      "ad_personalization": "denied",
+      "analytics_storage": "denied",
+      "functionality_storage": "granted",
+      "personalization_storage": "denied",
+      "security_storage": "granted"
+    },
+    "categoryMap": {
+      "necessary": [
+        "functionality_storage",
+        "security_storage"
+      ],
+      "analytics": [
+        "analytics_storage"
+      ],
+      "marketing": [
+        "ad_storage",
+        "ad_user_data",
+        "ad_personalization"
+      ],
+      "personalization": [
+        "personalization_storage"
+      ]
+    },
+    "regionalOverrides": [
+      {
+        "region": [
+          "AT",
+          "BE",
+          "BG",
+          "CY",
+          "CZ",
+          "DE",
+          "DK",
+          "EE",
+          "ES",
+          "FI",
+          "FR",
+          "GR",
+          "HR",
+          "HU",
+          "IE",
+          "IT",
+          "LT",
+          "LU",
+          "LV",
+          "MT",
+          "NL",
+          "PL",
+          "PT",
+          "RO",
+          "SE",
+          "SI",
+          "SK",
+          "GB",
+          "CH",
+          "LI",
+          "NO"
+        ],
+        "displayName": "EEA + UK + CH",
+        "state": {
+          "ad_storage": "denied",
+          "ad_user_data": "denied",
+          "ad_personalization": "denied",
+          "analytics_storage": "denied",
+          "functionality_storage": "granted",
+          "personalization_storage": "denied",
+          "security_storage": "granted"
+        }
+      }
+    ],
+    "recordConsent": true
+  },
+  "dataLayer": {
+    "eventName": "cmp.consent_ready"
+  },
+  "gpc": {
+    "enabled": true,
+    "showNotice": true,
+    "denyCategories": [
+      "marketing",
+      "personalization"
+    ]
+  },
+  "cookieCleanup": {
+    "mode": "on_explicit_denial"
+  },
+  "categories": [
+    {
+      "id": "necessary",
+      "label": "Necessary",
+      "description": "Required for security, consent storage, and basic site functionality.",
+      "required": true,
+      "default": true
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "description": "Helps measure traffic and improve the site.",
+      "required": false,
+      "default": false
+    },
+    {
+      "id": "marketing",
+      "label": "Marketing",
+      "description": "Supports advertising measurement, remarketing, and campaign attribution.",
+      "required": false,
+      "default": false
+    },
+    {
+      "id": "personalization",
+      "label": "Personalization",
+      "description": "Stores choices and content preferences beyond strictly necessary settings.",
+      "required": false,
+      "default": false
+    }
+  ],
+  "services": [
+    {
+      "id": "ga4",
+      "name": "Google Analytics 4",
+      "category": "analytics",
+      "enabled": false,
+      "cookies": [
+        "_ga",
+        "_ga_*"
+      ],
+      "notes": "Enable when GA4 is implemented."
+    },
+    {
+      "id": "google-ads",
+      "name": "Google Ads",
+      "category": "marketing",
+      "enabled": false,
+      "cookies": [
+        "_gcl_*",
+        "_gac_*"
+      ],
+      "notes": "Enable when Google Ads conversion or remarketing tags are implemented."
+    }
+  ],
+  "updatedAt": "2026-05-10T15:05:52.497Z"
+}

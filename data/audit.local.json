@@ -1,5 +1,43 @@
 [
   {
+    "id": "vqwk5qo8",
+    "type": "config.published",
+    "details": {
+      "siteId": "new-site-test",
+      "environment": "production",
+      "version": "20260510T151231Z"
+    },
+    "createdAt": "2026-05-10T15:12:31.559Z"
+  },
+  {
+    "id": "22u52g9f",
+    "type": "config.published",
+    "details": {
+      "siteId": "new-site-test",
+      "environment": "production",
+      "version": "20260510T151229Z"
+    },
+    "createdAt": "2026-05-10T15:12:29.489Z"
+  },
+  {
+    "id": "chf26kl9",
+    "type": "config.saved",
+    "details": {
+      "siteId": "new-site-test",
+      "version": "draft"
+    },
+    "createdAt": "2026-05-10T15:12:05.528Z"
+  },
+  {
+    "id": "7ui2rx31",
+    "type": "site.created",
+    "details": {
+      "siteId": "new-site-test",
+      "clonedFrom": "demo-site"
+    },
+    "createdAt": "2026-05-10T15:10:56.263Z"
+  },
+  {
     "id": "43ja5neh",
     "type": "config.published",
     "details": {

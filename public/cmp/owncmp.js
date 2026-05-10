@@ -9,6 +9,8 @@
   var dataLayerName = attr("data-layer", "dataLayer");
   var manageGoogleConsent = attr("data-google-consent", "true") !== "false";
   var api = createApi();
+  var pendingCid = null;
+  var bannerRecordSent = false;
 
   var fallbackGoogleState = {
     ad_storage: "denied",
@@ -104,6 +106,7 @@
 
     injectStyles();
     appendToBody(root);
+    dispatchBannerShown(config, gpcActive);
 
     var panel = root.querySelector(".owncmp-panel");
     var focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -131,10 +134,10 @@
     });
 
     root.querySelector("[data-owncmp-accept]").addEventListener("click", function () {
-      choose(config, allSelection(config, true), "user");
+      choose(config, allSelection(config, true), "user", "accept_all");
     });
     root.querySelector("[data-owncmp-reject]").addEventListener("click", function () {
-      choose(config, allSelection(config, false), "user");
+      choose(config, allSelection(config, false), "user", "reject_all");
     });
     root.querySelector("[data-owncmp-preferences]").addEventListener("click", function () {
       root.querySelector(".owncmp-preferences").hidden = false;
@@ -148,13 +151,13 @@
         var input = root.querySelector('[data-owncmp-category="' + cssEscape(category.id) + '"]');
         next[category.id] = category.required || Boolean(input && input.checked);
       });
-      choose(config, next, "user");
+      choose(config, next, "user", "save_choices");
     });
   }
 
-  function choose(config, categories, source) {
+  function choose(config, categories, source, action) {
     if (window.performance && performance.mark) performance.mark("owncmp-interaction");
-    var record = buildRecord(config, categories, source);
+    var record = buildRecord(config, categories, source, action);
     writeStoredConsent(config, record);
     applyConsent(config, record, source);
     dispatchRecord(config, record);
@@ -177,16 +180,35 @@
     notifyGtmBridge(record);
   }
 
+  function dispatchBannerShown(config, gpcActive) {
+    if (bannerRecordSent) return;
+    var record = {
+      schemaVersion: 1,
+      type: "banner_shown",
+      cid: getPendingCid(config),
+      siteId: config.siteId || siteId,
+      configVersion: config.version || "draft",
+      source: "runtime",
+      gpc: Boolean(gpcActive),
+      createdAt: new Date().toISOString()
+    };
+    bannerRecordSent = true;
+    dispatchRecord(config, record);
+  }
+
   function dispatchRecord(config, record) {
     if (config.googleConsentMode && config.googleConsentMode.recordConsent === false) return;
     
     var endpoint = configUrl.split("/api/public/config")[0] + "/api/public/record";
     var payload = {
       siteId: config.siteId || siteId,
+      type: record.type || "decision",
       configVersion: config.version,
       cid: record.cid,
       source: record.source,
-      categories: record.categories
+      action: record.action,
+      categories: record.categories,
+      gpc: record.gpc
     };
 
     if (typeof fetch === "function") {
@@ -272,15 +294,17 @@
     return selection;
   }
 
-  function buildRecord(config, categories, source) {
+  function buildRecord(config, categories, source, action) {
     var existing = readStoredConsent(config);
     var now = new Date().toISOString();
     return {
       schemaVersion: 1,
-      cid: (existing && existing.cid) || Math.random().toString(36).slice(2) + Date.now().toString(36),
+      type: "decision",
+      cid: (existing && existing.cid) || getPendingCid(config),
       siteId: config.siteId || siteId,
       configVersion: config.version || "draft",
       source: source,
+      action: action || "save_choices",
       categories: categories,
       googleConsent: mapGoogleConsent(config, categories),
       gpc: Boolean(navigator.globalPrivacyControl === true),
@@ -321,6 +345,15 @@
 
   function cookieName(config) {
     return (config.consentCookieName || "owncmp_consent") + "_" + (config.siteId || siteId);
+  }
+
+  function getPendingCid(config) {
+    var existing = readStoredConsent(config);
+    if (existing && existing.cid) return existing.cid;
+    if (!pendingCid) {
+      pendingCid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    return pendingCid;
   }
 
   function cleanupDeniedCookies(config, categories) {

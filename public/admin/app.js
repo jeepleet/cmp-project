@@ -1,7 +1,10 @@
 const state = {
   config: null,
   activeConfig: null,
+  sites: [],
+  selectedSiteId: null,
   versions: [],
+  report: null,
   dirty: false,
   session: null
 };
@@ -40,7 +43,7 @@ async function loadSession() {
 
   if (session.authenticated) {
     updateUserInfo(session);
-    await loadConfig();
+    await loadSitesAndConfig();
     showApp();
   } else {
     showLogin();
@@ -71,7 +74,7 @@ function bindLogin() {
         }
       });
       updateUserInfo(session);
-      await loadConfig();
+      await loadSitesAndConfig();
       showApp();
     } catch (error) {
       if (errorEl) {
@@ -106,9 +109,15 @@ function bindActions() {
   safeListen("#import-button", "click", () => qs("#import-input")?.click());
   safeListen("#import-input", "change", importConfig);
   safeListen("#logout-button", "click", logout);
+  safeListen("#site-select", "change", switchSite);
+  safeListen("#create-site-button", "click", createSite);
   safeListen("#add-service-button", "click", addService);
   safeListen("#add-override-button", "click", addRegionalOverride);
   safeListen("#refresh-history-button", "click", loadVersionsAndRender);
+  safeListen("#refresh-report-button", "click", loadReportAndRender);
+  safeListen("#report-period", "change", handleReportPeriodChange);
+  safeListen("#report-from", "change", loadReportAndRender);
+  safeListen("#report-to", "change", loadReportAndRender);
   safeListen("#process-scan-button", "click", processScan);
   safeListen("#scanner-script-copy", "click", () => {
     navigator.clipboard.writeText(qs("#scanner-script-copy").textContent);
@@ -147,10 +156,26 @@ function bindActions() {
   });
 }
 
-async function loadConfig() {
-  state.config = await api("/api/config");
-  await Promise.all([loadActiveConfig(), loadVersions()]);
+async function loadSitesAndConfig(preferredSiteId = null) {
+  state.sites = await api("/api/sites");
+  const savedSiteId = localStorage.getItem("owncmp.selectedSiteId");
+  const targetSiteId = preferredSiteId || savedSiteId || state.sites[0]?.siteId;
+  const site = state.sites.find((item) => item.siteId === targetSiteId) || state.sites[0];
+
+  if (!site) {
+    throw new Error("No CMP sites are available.");
+  }
+
+  await loadConfig(site.siteId);
+}
+
+async function loadConfig(siteId = state.selectedSiteId) {
+  state.selectedSiteId = siteId;
+  localStorage.setItem("owncmp.selectedSiteId", siteId);
+  state.config = await api(`/api/config/${encodeURIComponent(siteId)}`);
+  await Promise.all([loadActiveConfig(), loadVersions(), loadReport()]);
   state.dirty = false;
+  renderSiteSelector();
   renderAll();
 }
 
@@ -176,15 +201,116 @@ async function loadVersionsAndRender() {
   renderHistory();
 }
 
+async function loadReport() {
+  try {
+    state.report = await api(`/api/reports/consent/${encodeURIComponent(state.config.siteId)}?${reportQuery()}`);
+  } catch (error) {
+    console.error("Failed to load report:", error);
+    state.report = null;
+  }
+}
+
+async function loadReportAndRender() {
+  await loadReport();
+  renderReport();
+}
+
+function handleReportPeriodChange() {
+  const isCustom = qs("#report-period")?.value === "custom";
+  qsa(".report-custom-range").forEach((field) => {
+    field.hidden = !isCustom;
+  });
+
+  if (isCustom) {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    if (qs("#report-from") && !qs("#report-from").value) qs("#report-from").value = monthAgo;
+    if (qs("#report-to") && !qs("#report-to").value) qs("#report-to").value = today;
+  }
+
+  loadReportAndRender();
+}
+
+function reportQuery() {
+  const period = qs("#report-period")?.value || "30";
+  if (period === "custom") {
+    const params = new URLSearchParams();
+    const from = qs("#report-from")?.value;
+    const to = qs("#report-to")?.value;
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    return params.toString() || "days=30";
+  }
+  return `days=${encodeURIComponent(period)}`;
+}
+
 function renderAll() {
+  renderSiteSelector();
   renderBannerForm();
   renderOverview();
   renderCategories();
   renderServices();
+  renderReport();
   renderDiff();
   renderHistory();
   renderSnippets();
   updateSaveState();
+}
+
+function renderSiteSelector() {
+  const select = qs("#site-select");
+  if (!select) return;
+
+  select.innerHTML = state.sites.map((site) => {
+    const label = `${site.siteName} (${site.siteId})`;
+    return `<option value="${escapeHtml(site.siteId)}">${escapeHtml(label)}</option>`;
+  }).join("");
+  select.value = state.selectedSiteId || state.config?.siteId || "";
+}
+
+async function switchSite(event) {
+  const nextSiteId = event.target.value;
+  if (!nextSiteId || nextSiteId === state.selectedSiteId) return;
+
+  if (state.dirty && !window.confirm("Discard unsaved draft changes and switch site?")) {
+    event.target.value = state.selectedSiteId;
+    return;
+  }
+
+  try {
+    await loadConfig(nextSiteId);
+  } catch (error) {
+    alert("Failed to switch site: " + error.message);
+    event.target.value = state.selectedSiteId;
+  }
+}
+
+async function createSite() {
+  if (state.dirty && !window.confirm("Discard unsaved draft changes and create a new site?")) return;
+
+  const siteName = window.prompt("Site name", "New Site");
+  if (!siteName) return;
+
+  const defaultSiteId = slugify(siteName);
+  const siteId = window.prompt("Site ID", defaultSiteId);
+  if (!siteId) return;
+
+  const cloneCurrent = Boolean(state.config && window.confirm("Copy settings from the current site?"));
+
+  try {
+    const created = await api("/api/sites", {
+      method: "POST",
+      body: {
+        siteId,
+        siteName,
+        cloneFrom: cloneCurrent ? state.config.siteId : null
+      }
+    });
+    state.sites = await api("/api/sites");
+    await loadConfig(created.siteId);
+  } catch (error) {
+    alert("Failed to create site: " + error.message);
+  }
 }
 
 function renderBannerForm() {
@@ -381,6 +507,70 @@ function renderServices() {
   });
 }
 
+function renderReport() {
+  const report = state.report;
+  const empty = {
+    totals: { impressions: 0, accepts: 0, rejects: 0, partials: 0, ignores: 0, outcomes: 0 },
+    rates: { accept: 0, reject: 0, partial: 0, ignore: 0, response: 0, decision: 0 },
+    daily: []
+  };
+  const data = report || empty;
+  const totals = data.totals;
+  const rates = data.rates;
+
+  setText("#report-accepts", formatNumber(totals.accepts));
+  setText("#report-rejects", formatNumber(totals.rejects));
+  setText("#report-ignores", formatNumber(totals.ignores));
+  setText("#report-impressions", formatNumber(totals.impressions));
+  setText("#report-outcomes", formatNumber(totals.outcomes));
+  setText("#report-accept-rate", `${formatRate(rates.accept)} of tracked outcomes`);
+  setText("#report-reject-rate", `${formatRate(rates.reject)} of tracked outcomes`);
+  setText("#report-ignore-rate", `${formatRate(rates.ignore)} of tracked outcomes`);
+  setText("#report-decision-rate", `${formatRate(rates.response)} response rate`);
+  setText("#report-period-label", reportPeriodLabel(data));
+
+  const bars = qs("#report-bars");
+  if (bars) {
+    bars.innerHTML = [
+      reportBar("Accept", rates.accept, "accept"),
+      reportBar("Reject", rates.reject, "reject"),
+      reportBar("Partial", rates.partial, "partial"),
+      reportBar("Ignore", rates.ignore, "ignore")
+    ].join("");
+  }
+
+  const rows = qs("#report-daily-rows");
+  if (!rows) return;
+  if (!data.daily.length) {
+    rows.innerHTML = '<tr><td colspan="6" class="empty-state">No report records for this period yet.</td></tr>';
+    return;
+  }
+
+  rows.innerHTML = data.daily.slice().reverse().map((day) => `
+    <tr>
+      <td>${escapeHtml(day.date)}</td>
+      <td>${formatNumber(day.impressions)}</td>
+      <td>${formatNumber(day.accepts)}</td>
+      <td>${formatNumber(day.rejects)}</td>
+      <td>${formatNumber(day.partials)}</td>
+      <td>${formatNumber(day.ignores)}</td>
+    </tr>
+  `).join("");
+}
+
+function reportBar(label, value, type) {
+  const width = Math.max(0, Math.min(100, Number(value || 0)));
+  return `
+    <div class="report-bar ${escapeHtml(type)}">
+      <strong>${escapeHtml(label)}</strong>
+      <div class="report-bar-track">
+        <div class="report-bar-fill" style="width: ${width}%"></div>
+      </div>
+      <span>${formatRate(value)}</span>
+    </div>
+  `;
+}
+
 function renderHistory() {
   const rows = qs("#history-rows");
   if (!rows) return;
@@ -473,11 +663,12 @@ function addService() {
 
 async function saveDraft() {
   try {
-    const saved = await api("/api/config", {
+    const saved = await api(`/api/config/${encodeURIComponent(state.config.siteId)}`, {
       method: "PUT",
       body: state.config
     });
     state.config = saved;
+    state.sites = await api("/api/sites");
     state.dirty = false;
     renderAll();
   } catch (error) {
@@ -507,17 +698,20 @@ async function importConfig(event) {
       throw new Error("Invalid configuration file: missing siteId or categories.");
     }
 
-    if (!window.confirm("Importing this file will overwrite your current draft. Continue?")) {
+    if (!window.confirm("Importing this file will overwrite the current site's draft. Continue?")) {
       event.target.value = "";
       return;
     }
 
-    const saved = await api("/api/config", {
+    config.siteId = state.config.siteId;
+
+    const saved = await api(`/api/config/${encodeURIComponent(state.config.siteId)}`, {
       method: "PUT",
       body: config
     });
 
     state.config = saved;
+    state.sites = await api("/api/sites");
     state.dirty = false;
     renderAll();
     alert("Configuration imported successfully.");
@@ -670,6 +864,7 @@ async function publishConfig() {
     });
     state.config = published;
     state.activeConfig = clone(published);
+    state.sites = await api("/api/sites");
     await loadVersions();
     state.dirty = false;
     renderAll();
@@ -703,6 +898,7 @@ async function restoreVersion(version) {
     state.config = restored;
     state.activeConfig = clone(restored);
     state.dirty = false;
+    state.sites = await api("/api/sites");
     await loadVersions();
     renderAll();
     qs("#version-preview").textContent = JSON.stringify(restored, null, 2);
@@ -714,6 +910,9 @@ async function restoreVersion(version) {
 async function logout() {
   await api("/api/logout", { method: "POST" });
   state.config = null;
+  state.activeConfig = null;
+  state.sites = [];
+  state.selectedSiteId = null;
   showLogin();
 }
 
@@ -823,6 +1022,26 @@ function flattenForDiff(value, prefix = "", output = {}) {
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleString() : "-";
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function formatRate(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
+function reportPeriodLabel(report) {
+  if (!report?.from || !report?.to) return "-";
+  const from = report.from.slice(0, 10);
+  const to = report.to.slice(0, 10);
+  return `${from} to ${to}`;
+}
+
+function setText(selector, value) {
+  const element = qs(selector);
+  if (element) element.textContent = value;
 }
 
 function clone(value) {

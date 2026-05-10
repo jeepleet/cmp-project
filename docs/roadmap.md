@@ -43,9 +43,9 @@
 
 ## Phase 5: Operational Scale and Insights
 
-- Multi-site support (Site selection in Admin)
-- Durable database migration (SQLite or Postgres)
-- Consent Reporting Dashboard (Acceptance vs. Rejection rates)
+- [x] Multi-site support (site selection, site creation, and site-scoped drafts)
+- [x] Durable database migration (SQLite)
+- [x] Consent Reporting Dashboard (accept, reject, partial, and ignore rates)
 - TCF 2.2 Foundation (Legal vendor list support)
 - Admin UI Polish (Dark mode, better error states)
 

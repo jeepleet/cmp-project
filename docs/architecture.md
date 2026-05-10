@@ -12,15 +12,41 @@
 
 ### Admin backend
 
-The backend in `src/server` uses native Node modules only. It serves the admin UI, handles login sessions, stores draft config in `data/config.json`, and publishes immutable public config snapshots under `data/published`.
+The backend in `src/server` uses native Node modules only. It serves the admin UI, handles login sessions, stores site-scoped draft configs, and publishes immutable public config snapshots.
 
-Active production config lives at:
+The default storage driver is SQLite:
+
+```text
+data/owncmp.sqlite
+```
+
+SQLite is used for site drafts, published configs, immutable versions, changelogs, audit events, and consent records.
+
+The local JSON storage layout is still supported as a fallback when `CMP_STORAGE=json` is set. On first SQLite startup, existing JSON data is imported once into the SQLite database.
+
+Legacy/source JSON paths:
+
+Site draft configs live at:
+
+```text
+data/sites/:siteId/config.json
+```
+
+The site index lives at:
+
+```text
+data/sites/index.json
+```
+
+`data/config.json` is kept as a legacy/local compatibility mirror for `demo-site` in JSON mode and as an import source for SQLite migration.
+
+Active production config historically lived at:
 
 ```text
 data/published/:siteId/:environment.json
 ```
 
-Immutable version snapshots live at:
+Immutable version snapshots historically lived at:
 
 ```text
 data/published/:siteId/versions/:environment/:version.json
@@ -28,11 +54,11 @@ data/published/:siteId/versions/:environment/:version.json
 
 Rollback copies a selected immutable snapshot back to the active production config and records an audit event.
 
-This is intentionally simple for the first slice. Later, the storage layer can be swapped for Postgres without changing the runtime contract.
+The runtime contract does not depend on the storage driver. A later Postgres driver can use the same storage function boundary.
 
 ### Admin UI
 
-The admin UI in `public/admin` is a vanilla web app. It edits banner copy, colors, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
+The admin UI in `public/admin` is a vanilla web app. It has a site selector, a new-site flow, and guarded switching when draft changes are unsaved. For the selected site, it edits banner copy, colors, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
 
 ### Public config endpoint
 
@@ -44,7 +70,7 @@ The runtime fetches:
 
 The response is public by design. It should contain only configuration that is safe for browsers to read.
 
-The special `preview` environment returns the current draft config and requires an active admin session.
+The special `preview` environment returns the requested site's current draft config and requires an active admin session.
 
 The public changelog endpoint is:
 
@@ -53,6 +79,25 @@ The public changelog endpoint is:
 ```
 
 Unknown site IDs return `404` instead of silently serving another site's config.
+
+### Reporting
+
+The admin reporting endpoint is:
+
+```text
+GET /api/reports/consent/:siteId?days=30
+GET /api/reports/consent/:siteId?from=YYYY-MM-DD&to=YYYY-MM-DD
+```
+
+In SQLite mode it reads the `consent_records` table. In JSON fallback mode it reads consent record JSONL files from:
+
+```text
+data/records/:siteId/YYYY-MM.log
+```
+
+The runtime records `banner_shown` when the banner appears and `decision` when a user chooses Accept, Reject, or Save Choices. Both records share the same generated `cid` when the decision follows that banner view.
+
+Reporting uses latest decision per `cid` for headline Accept, Reject, and Partial counts. Ignore is calculated as banner `cid`s without a matching decision in the selected period. Outcome percentages use tracked outcomes as the denominator: Accept + Reject + Partial + Other + Ignore. Response rate is calculated separately as decisions with a matching banner view divided by banner views. This is a practical no-interaction metric, not a browser-level unique-user identity.
 
 ### CMP runtime
 
@@ -128,9 +173,9 @@ These defaults can be edited in config. Region-specific defaults are represented
 
 ## Known Technical Debt
 
-- The local JSON storage is still a prototype persistence layer. Postgres or another durable store is needed before multi-user or hosted use.
 - GTM `.tpl` import and template tests still need manual confirmation inside Google Tag Manager.
-- Accessibility and performance audits are in progress.
+- The SQLite driver uses native `node:sqlite`, which currently requires Node.js 25+ and emits Node's experimental warning.
+- Postgres is still a later hosted-production option if multi-process or managed database operations become a requirement.
 
 Endpoint: `GET /api/public/cookie-db`
 Database: `src/server/cookie-db.json`

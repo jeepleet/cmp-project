@@ -13,12 +13,16 @@ import {
 } from "./auth.js";
 import {
   appendConsentRecord,
+  createSite,
   ensureInitialData,
   getAuditLog,
   getConfig,
   getConsentHistory,
+  getConsentReport,
   getPublishedConfig,
   getPublishedVersion,
+  getPublicChangelog,
+  listSites,
   listPublishedVersions,
   publishConfig,
   rollbackToVersion,
@@ -28,7 +32,6 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..");
 const PUBLIC_DIR = path.join(ROOT, "public");
-const DATA_DIR = path.join(ROOT, "data");
 const SRC_DIR = path.join(ROOT, "src");
 const PORT = Number(process.env.PORT || 8787);
 
@@ -109,9 +112,32 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/sites" && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    sendJson(res, 200, await listSites());
+    return;
+  }
+
+  if (url.pathname === "/api/sites" && req.method === "POST") {
+    if (!requireAuth(req, res)) return;
+    try {
+      const body = await readJsonBody(req);
+      sendJson(res, 201, await createSite(body));
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || "Could not create site" });
+    }
+    return;
+  }
+
   if (url.pathname === "/api/config" && req.method === "GET") {
     if (!requireAuth(req, res)) return;
-    sendJson(res, 200, await getConfig());
+    const siteId = url.searchParams.get("siteId") || undefined;
+    const config = await getConfig(siteId);
+    if (!config) {
+      sendJson(res, 404, { error: "Site not found" });
+      return;
+    }
+    sendJson(res, 200, config);
     return;
   }
 
@@ -119,6 +145,25 @@ async function handleRequest(req, res) {
     if (!requireAuth(req, res)) return;
     const body = await readJsonBody(req);
     sendJson(res, 200, await saveConfig(body));
+    return;
+  }
+
+  const adminConfigMatch = url.pathname.match(/^\/api\/config\/([^/]+)$/);
+  if (adminConfigMatch && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    const config = await getConfig(adminConfigMatch[1]);
+    if (!config) {
+      sendJson(res, 404, { error: "Site not found" });
+      return;
+    }
+    sendJson(res, 200, config);
+    return;
+  }
+
+  if (adminConfigMatch && req.method === "PUT") {
+    if (!requireAuth(req, res)) return;
+    const body = await readJsonBody(req);
+    sendJson(res, 200, await saveConfig(body, adminConfigMatch[1]));
     return;
   }
 
@@ -168,6 +213,16 @@ async function handleRequest(req, res) {
     return;
   }
 
+  const reportMatch = url.pathname.match(/^\/api\/reports\/consent\/([^/]+)$/);
+  if (reportMatch && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    const days = url.searchParams.get("days") || 30;
+    const from = url.searchParams.get("from") || "";
+    const to = url.searchParams.get("to") || "";
+    sendJson(res, 200, await getConsentReport(reportMatch[1], { days, from, to }));
+    return;
+  }
+
   const publicConfigMatch = url.pathname.match(/^\/api\/public\/config\/([^/]+)(?:\/([^/]+))?$/);
   if (publicConfigMatch && req.method === "GET") {
     const [, siteId, environment = "production"] = publicConfigMatch;
@@ -175,7 +230,11 @@ async function handleRequest(req, res) {
     // If requesting preview environment, require authentication
     if (environment === "preview") {
       if (!requireAuth(req, res)) return;
-      const draft = await getConfig();
+      const draft = await getConfig(siteId);
+      if (!draft) {
+        sendJson(res, 404, { error: "Site not found" }, corsHeaders());
+        return;
+      }
       sendJson(res, 200, draft, corsHeaders({
         "Cache-Control": "no-store"
       }));
@@ -196,8 +255,7 @@ async function handleRequest(req, res) {
   const publicChangelogMatch = url.pathname.match(/^\/api\/public\/changelog\/([^/]+)$/);
   if (publicChangelogMatch && req.method === "GET") {
     const siteId = safeSegment(publicChangelogMatch[1]);
-    const filePath = path.join(DATA_DIR, "published", siteId, "changelog.json");
-    const changelog = await readJsonFile(filePath, []);
+    const changelog = await getPublicChangelog(siteId);
     sendJson(res, 200, changelog, corsHeaders({
       "Cache-Control": "public, max-age=300"
     }));

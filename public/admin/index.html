@@ -35,6 +35,11 @@
           <h1 id="site-heading">Consent workspace</h1>
         </div>
         <div class="topbar-actions">
+          <label class="site-picker">
+            Site
+            <select id="site-select"></select>
+          </label>
+          <button id="create-site-button" class="button subtle" type="button">New site</button>
           <div id="user-info" style="font-size: 13px; text-align: right; margin-right: 10px;">
             <div id="user-email" style="font-weight: 700;">-</div>
           </div>
@@ -51,6 +56,7 @@
           <button class="nav-item" data-panel="banner">Banner</button>
           <button class="nav-item" data-panel="consent">Consent</button>
           <button class="nav-item" data-panel="services">Services</button>
+          <button class="nav-item" data-panel="reporting">Reporting</button>
           <button class="nav-item" data-panel="history">History</button>
           <button class="nav-item" data-panel="scanner">Scanner</button>
           <button class="nav-item" data-panel="snippets">Snippets</button>
@@ -111,7 +117,7 @@
               </label>
               <label>
                 Site ID
-                <input name="siteId" type="text" pattern="[A-Za-z0-9_-]+" maxlength="80">
+                <input name="siteId" type="text" pattern="[A-Za-z0-9_-]+" maxlength="80" readonly>
               </label>
               <label class="span-2">
                 Title
@@ -235,6 +241,89 @@
                 </thead>
                 <tbody id="service-rows"></tbody>
               </table>
+            </div>
+          </section>
+
+          <section id="panel-reporting" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Reporting</h2>
+                <p>Consent outcomes for the selected site.</p>
+              </div>
+              <div class="topbar-actions">
+                <label class="period-picker">
+                  Period
+                  <select id="report-period">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last 365 days</option>
+                    <option value="custom">Custom range</option>
+                  </select>
+                </label>
+                <label class="period-picker report-custom-range" hidden>
+                  From
+                  <input id="report-from" type="date">
+                </label>
+                <label class="period-picker report-custom-range" hidden>
+                  To
+                  <input id="report-to" type="date">
+                </label>
+                <button id="refresh-report-button" class="button">Refresh</button>
+              </div>
+            </div>
+
+            <div class="report-grid">
+              <div class="metric report-metric">
+                <span>Accept</span>
+                <strong id="report-accepts">-</strong>
+                <small id="report-accept-rate">-</small>
+              </div>
+              <div class="metric report-metric">
+                <span>Reject</span>
+                <strong id="report-rejects">-</strong>
+                <small id="report-reject-rate">-</small>
+              </div>
+              <div class="metric report-metric">
+                <span>Ignore</span>
+                <strong id="report-ignores">-</strong>
+                <small id="report-ignore-rate">-</small>
+              </div>
+              <div class="metric report-metric">
+                <span>Banner views</span>
+                <strong id="report-impressions">-</strong>
+                <small id="report-decision-rate">-</small>
+              </div>
+              <div class="metric report-metric">
+                <span>Tracked outcomes</span>
+                <strong id="report-outcomes">-</strong>
+                <small id="report-period-label">-</small>
+              </div>
+            </div>
+
+            <div class="runtime-contract">
+              <h3>Outcome mix</h3>
+              <div id="report-bars" class="report-bars"></div>
+              <p class="empty-state" style="margin-top: 10px;">Outcome percentages are based on tracked outcomes: latest Accept, Reject, Partial decisions plus ignored banner views. Ignore means a banner was shown but no matching decision exists for that generated consent ID in the selected period.</p>
+            </div>
+
+            <div class="runtime-contract">
+              <h3>Daily breakdown</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Views</th>
+                      <th>Accept</th>
+                      <th>Reject</th>
+                      <th>Partial</th>
+                      <th>Ignore</th>
+                    </tr>
+                  </thead>
+                  <tbody id="report-daily-rows"></tbody>
+                </table>
+              </div>
             </div>
           </section>
 

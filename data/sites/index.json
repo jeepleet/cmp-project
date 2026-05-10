@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-10T15:47:51.182Z",
+  "sites": [
+    {
+      "siteId": "demo-site",
+      "siteName": "Demo Site",
+      "environment": "production",
+      "draftVersion": "20260508T165641Z",
+      "activeVersion": "20260508T165641Z",
+      "updatedAt": "2026-05-10T15:05:52.497Z",
+      "lastPublishedAt": "2026-05-08T16:56:41.632Z",
+      "hasPublished": true,
+      "categoryCount": 4,
+      "serviceCount": 2
+    },
+    {
+      "siteId": "new-site-test",
+      "siteName": "New Site Test",
+      "environment": "production",
+      "draftVersion": "20260510T151231Z",
+      "activeVersion": "20260510T151231Z",
+      "updatedAt": "2026-05-10T15:12:31.531Z",
+      "lastPublishedAt": "2026-05-10T15:12:31.531Z",
+      "hasPublished": true,
+      "categoryCount": 4,
+      "serviceCount": 2
+    }
+  ]
+}
