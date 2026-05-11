@@ -44,6 +44,14 @@ The build script combines `gtm/own-cmp-consent-mode-template-code.js` and `gtm/t
 
 Use the non-deferred form above before the GTM container snippet when possible. The runtime is intentionally small and sets up `window.OwnCMP` immediately; the config fetch and banner rendering happen asynchronously.
 
+For controlled launches, replace the active production config URL with the pinned version URL shown in Admin:
+
+```html
+data-config-url="https://your-cmp-domain.example/api/public/config/demo-site/production/20260508T165641Z"
+```
+
+Pinned config URLs are immutable and can be cached long-term. Active production URLs update automatically after publish and use short revalidated caching.
+
 ## Current Limitations
 
 - `gtm/template.tpl` exists, but it still needs manual import verification inside GTM.

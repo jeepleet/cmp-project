@@ -58,6 +58,7 @@
           <button class="nav-item" data-panel="services">Services</button>
           <button class="nav-item" data-panel="reporting">Reporting</button>
           <button class="nav-item" data-panel="history">History</button>
+          <button class="nav-item" data-panel="storage">Storage</button>
           <button class="nav-item" data-panel="scanner">Scanner</button>
           <button class="nav-item" data-panel="snippets">Snippets</button>
         </aside>
@@ -107,7 +108,7 @@
             <div class="section-head">
               <div>
                 <h2>Banner</h2>
-                <p>Text, colors, and first-layer actions.</p>
+                <p>Text, layout, logo, colors, and first-layer actions.</p>
               </div>
             </div>
             <form id="banner-form" class="form-grid">
@@ -143,6 +144,23 @@
                 Save text
                 <input name="banner.saveText" type="text" maxlength="60">
               </label>
+              <label class="switch-row">
+                <input name="banner.positionCenter" type="checkbox" id="banner-position-center">
+                Show banner in the center
+              </label>
+              <label class="switch-row">
+                <input name="banner.positionBottom" type="checkbox" id="banner-position-bottom">
+                Show banner at the bottom
+              </label>
+              <label class="span-2">
+                Logo
+                <input id="banner-logo-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
+              </label>
+              <div id="banner-logo-preview" class="logo-preview span-2"></div>
+              <label class="span-2">
+                Logo alt text
+                <input name="banner.logoAlt" type="text" maxlength="120">
+              </label>
               <label>
                 Background
                 <input name="banner.theme.background" type="color">
@@ -158,6 +176,10 @@
               <label>
                 Neutral
                 <input name="banner.theme.neutral" type="color">
+              </label>
+              <label class="span-2">
+                Custom banner CSS
+                <textarea name="banner.customCss" rows="8" maxlength="12000"></textarea>
               </label>
             </form>
           </section>
@@ -187,6 +209,10 @@
               <label class="switch-row">
                 <input id="gpc-enabled" type="checkbox">
                 Detect GPC
+              </label>
+              <label class="switch-row">
+                <input id="shopify-privacy-enabled" type="checkbox">
+                Connect to Shopify Customer Privacy API
               </label>
               <label>
                 Consent cookie days
@@ -270,6 +296,8 @@
                   <input id="report-to" type="date">
                 </label>
                 <button id="refresh-report-button" class="button">Refresh</button>
+                <button id="export-consent-json-button" class="button subtle" type="button">Export JSON</button>
+                <button id="export-consent-csv-button" class="button subtle" type="button">Export CSV</button>
               </div>
             </div>
 
@@ -353,6 +381,81 @@
             <pre id="version-preview">Select a version to inspect it.</pre>
           </section>
 
+          <section id="panel-storage" class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Storage</h2>
+                <p>Backups, consent-record cleanup, and data health.</p>
+              </div>
+              <div class="topbar-actions">
+                <button id="refresh-backups-button" class="button">Refresh</button>
+                <button id="create-backup-button" class="button primary">Create backup</button>
+              </div>
+            </div>
+            <div class="runtime-contract">
+              <h3>Status</h3>
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <span>Data store</span>
+                  <strong id="storage-driver">-</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Database size</span>
+                  <strong id="storage-size">-</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Consent records</span>
+                  <strong id="storage-consent-records">-</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Backups</span>
+                  <strong id="storage-backups">-</strong>
+                </div>
+              </div>
+              <details class="technical-details">
+                <summary>Technical details</summary>
+                <pre id="storage-status-details" class="compact-pre">Loading storage status...</pre>
+              </details>
+            </div>
+            <div class="runtime-contract">
+              <h3>Consent record retention</h3>
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <span>Policy</span>
+                  <strong id="retention-policy">-</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Cutoff</span>
+                  <strong id="retention-cutoff">-</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Expired records</span>
+                  <strong id="retention-expired">-</strong>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button id="purge-retention-button" class="button" type="button">Purge expired records</button>
+              </div>
+            </div>
+            <div class="runtime-contract">
+              <h3>Backups</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Driver</th>
+                      <th>Size</th>
+                      <th>Modified</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="backup-rows"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section id="panel-scanner" class="panel">
             <div class="section-head">
               <div>
@@ -388,11 +491,16 @@
             </div>
             <h3>Website script</h3>
             <pre id="script-snippet"></pre>
+            <h3>Pinned production script</h3>
+            <pre id="pinned-script-snippet"></pre>
             <h3>Website script when using the GTM bridge</h3>
             <pre id="gtm-script-snippet"></pre>
+            <h3>Pinned production script when using the GTM bridge</h3>
+            <pre id="pinned-gtm-script-snippet"></pre>
             <h3>GTM custom event</h3>
             <pre id="gtm-snippet"></pre>
           </section>
+
         </section>
       </div>
     </main>

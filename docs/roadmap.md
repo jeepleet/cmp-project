@@ -46,8 +46,26 @@
 - [x] Multi-site support (site selection, site creation, and site-scoped drafts)
 - [x] Durable database migration (SQLite)
 - [x] Consent Reporting Dashboard (accept, reject, partial, and ignore rates)
-- TCF 2.2 Foundation (Legal vendor list support)
-- Admin UI Polish (Dark mode, better error states)
+
+## Phase 6: Production Deployment Readiness
+
+- [x] Secure admin authentication hardening
+- [x] HTTPS-aware session cookies
+- [x] CSRF protection for admin write endpoints
+- [x] Login rate limiting
+- [x] SQLite backup and restore workflow
+- [x] Production environment configuration guide
+- [x] Runtime cache and versioning strategy
+- [x] Consent record retention policy
+- [x] Consent record export by site and date range
+- [x] Storage/status screen in Admin
+- Final GTM `.tpl` import and template verification
+
+## Later Track: Product Polish
+
+- Admin UI polish (dark mode, better error states)
+- Scanner UX and cookie database expansion
+- Broader reporting views
 
 ## Later Track: TCF
 

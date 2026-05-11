@@ -4,6 +4,8 @@ To integrate Own CMP into a WordPress site, you can use a lightweight PHP snippe
 
 ## Implementation
 
+The example below uses the active production config URL, so new published configs become active automatically. For controlled launches, replace the config URL with the pinned production version URL shown in Admin after publishing.
+
 Add the following code to the end of your theme's `functions.php` file (or use a plugin like "Code Snippets"):
 
 ```php

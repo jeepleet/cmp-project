@@ -12,11 +12,14 @@ const AUDIT_FILE = path.join(DATA_DIR, "audit.local.json");
 const SITES_DIR = path.join(DATA_DIR, "sites");
 const SITES_INDEX_FILE = path.join(SITES_DIR, "index.json");
 const DB_FILE = path.join(DATA_DIR, "owncmp.sqlite");
+const BACKUP_DIR = path.join(DATA_DIR, "backups");
 const STORAGE_DRIVER = String(process.env.CMP_STORAGE || "sqlite").toLowerCase();
 const USE_SQLITE = STORAGE_DRIVER !== "json";
+const CONSENT_RETENTION_DAYS = parseRetentionDays(process.env.CMP_CONSENT_RETENTION_DAYS);
 
 const require = createRequire(import.meta.url);
 let sqliteDb = null;
+let lastConsentRetentionPurgeDate = null;
 
 export const DEFAULT_SITE_ID = "demo-site";
 
@@ -37,8 +40,11 @@ export const DEFAULT_CONFIG = {
     preferencesText: "Preferences",
     saveText: "Save choices",
     closeText: "Close",
-    position: "bottom",
+    position: "center",
     language: "en",
+    logoDataUrl: "",
+    logoAlt: "",
+    customCss: "",
     theme: {
       background: "#ffffff",
       text: "#1d1f24",
@@ -85,6 +91,11 @@ export const DEFAULT_CONFIG = {
   },
   dataLayer: {
     eventName: "owncmp.consent_ready"
+  },
+  integrations: {
+    shopifyCustomerPrivacy: {
+      enabled: false
+    }
   },
   gpc: {
     enabled: true,
@@ -164,6 +175,13 @@ async function writeJson(filePath, value) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.${process.pid}.tmp`;
   await fs.writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await fs.rename(tmpPath, filePath);
+}
+
+async function writeText(filePath, value) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  await fs.writeFile(tmpPath, value, "utf8");
   await fs.rename(tmpPath, filePath);
 }
 
@@ -247,6 +265,26 @@ function getDb() {
   `);
 
   return sqliteDb;
+}
+
+function parseRetentionDays(value) {
+  if (value === undefined || value === null || value === "") return 390;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 390;
+  return Math.floor(parsed);
+}
+
+function validBannerLogoDataUrl(value) {
+  const text = String(value || "");
+  if (!text) return true;
+  if (text.length > 250000) return false;
+  return /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,[a-zA-Z0-9+/=]+$/.test(text);
+}
+
+function closeDb() {
+  if (!sqliteDb) return;
+  sqliteDb.close();
+  sqliteDb = null;
 }
 
 function jsonText(value) {
@@ -361,12 +399,61 @@ function sqliteAppendConsentRecord(siteId, record) {
   );
 }
 
+function sqliteCountExpiredConsentRecords(cutoff) {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS count FROM consent_records
+    WHERE ts < ?
+  `).get(cutoff.toISOString());
+  return Number(row?.count || 0);
+}
+
+function sqlitePurgeExpiredConsentRecords(cutoff) {
+  const count = sqliteCountExpiredConsentRecords(cutoff);
+  if (count > 0) {
+    getDb().prepare(`
+      DELETE FROM consent_records
+      WHERE ts < ?
+    `).run(cutoff.toISOString());
+  }
+  return count;
+}
+
+function sqliteTableCount(tableName) {
+  const allowed = new Set([
+    "sites",
+    "published_configs",
+    "published_versions",
+    "changelog",
+    "audit",
+    "consent_records"
+  ]);
+  if (!allowed.has(tableName)) return 0;
+  return Number(getDb().prepare(`SELECT COUNT(*) AS count FROM ${tableName}`).get()?.count || 0);
+}
+
 function safeSegment(value) {
   const segment = String(value || "").trim();
   if (!/^[a-zA-Z0-9_-]+$/.test(segment)) {
     throw new Error("Invalid path segment");
   }
   return segment;
+}
+
+function safeBackupFilename(value) {
+  const filename = String(value || "").trim();
+  if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}Z\.(sqlite|json)$/.test(filename)) {
+    throw new Error("Invalid backup filename");
+  }
+  return filename;
+}
+
+async function exportJsonBackup() {
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    sites: await listSites(),
+    audit: await getAuditLog()
+  };
 }
 
 function normalizeConfig(input, options = {}) {
@@ -379,6 +466,18 @@ function normalizeConfig(input, options = {}) {
   config.updatedAt = touch ? new Date().toISOString() : (config.updatedAt || new Date().toISOString());
 
   if (!config.banner) config.banner = structuredClone(DEFAULT_CONFIG.banner);
+  config.banner = {
+    ...structuredClone(DEFAULT_CONFIG.banner),
+    ...config.banner,
+    position: ["bottom", "center"].includes(config.banner.position) ? config.banner.position : "center",
+    logoDataUrl: validBannerLogoDataUrl(config.banner.logoDataUrl) ? config.banner.logoDataUrl : "",
+    logoAlt: String(config.banner.logoAlt || "").slice(0, 120),
+    customCss: String(config.banner.customCss || "").slice(0, 12000),
+    theme: {
+      ...structuredClone(DEFAULT_CONFIG.banner.theme),
+      ...(config.banner.theme || {})
+    }
+  };
   if (!config.googleConsentMode) {
     config.googleConsentMode = structuredClone(DEFAULT_CONFIG.googleConsentMode);
   } else {
@@ -408,6 +507,12 @@ function normalizeConfig(input, options = {}) {
   }));
 
   if (!config.dataLayer) config.dataLayer = structuredClone(DEFAULT_CONFIG.dataLayer);
+  if (!config.integrations) config.integrations = structuredClone(DEFAULT_CONFIG.integrations);
+  config.integrations.shopifyCustomerPrivacy = {
+    ...structuredClone(DEFAULT_CONFIG.integrations.shopifyCustomerPrivacy),
+    ...(config.integrations.shopifyCustomerPrivacy || {}),
+    enabled: Boolean(config.integrations.shopifyCustomerPrivacy?.enabled)
+  };
   if (!config.gpc) config.gpc = structuredClone(DEFAULT_CONFIG.gpc);
   if (!config.cookieCleanup) config.cookieCleanup = structuredClone(DEFAULT_CONFIG.cookieCleanup);
   if (!Array.isArray(config.categories)) config.categories = structuredClone(DEFAULT_CONFIG.categories);
@@ -563,6 +668,8 @@ export async function saveConfig(input, siteId = null) {
 }
 
 export async function appendConsentRecord(siteId, record) {
+  await maybePurgeExpiredConsentRecords();
+
   if (USE_SQLITE) {
     await ensureInitialData();
     const safeId = safeSegment(siteId);
@@ -586,6 +693,154 @@ export async function appendConsentRecord(siteId, record) {
   }) + "\n";
   
   await fs.appendFile(logPath, entry);
+}
+
+export async function getConsentRetentionStatus() {
+  await ensureInitialData();
+  const policy = consentRetentionPolicy();
+  const expiredCount = policy.enabled ? await countExpiredConsentRecords(policy.cutoffDate) : 0;
+  return {
+    ...policy,
+    expiredCount,
+    lastPurgeDate: USE_SQLITE ? sqliteGetMeta("consent_retention_last_purge") : lastConsentRetentionPurgeDate,
+    storageDriver: USE_SQLITE ? "sqlite" : "json"
+  };
+}
+
+export async function purgeExpiredConsentRecords(options = {}) {
+  await ensureInitialData();
+  const policy = consentRetentionPolicy();
+  if (!policy.enabled) {
+    return {
+      ...policy,
+      purgedCount: 0,
+      dryRun: Boolean(options.dryRun),
+      storageDriver: USE_SQLITE ? "sqlite" : "json"
+    };
+  }
+
+  const purgedCount = options.dryRun
+    ? await countExpiredConsentRecords(policy.cutoffDate)
+    : await deleteExpiredConsentRecords(policy.cutoffDate);
+
+  if (!options.dryRun) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (USE_SQLITE) sqliteSetMeta("consent_retention_last_purge", today);
+    lastConsentRetentionPurgeDate = today;
+    await appendAudit("consent.retention_purged", {
+      retentionDays: policy.retentionDays,
+      cutoff: policy.cutoff,
+      purgedCount
+    });
+  }
+
+  return {
+    ...policy,
+    purgedCount,
+    dryRun: Boolean(options.dryRun),
+    storageDriver: USE_SQLITE ? "sqlite" : "json"
+  };
+}
+
+async function maybePurgeExpiredConsentRecords() {
+  const policy = consentRetentionPolicy();
+  if (!policy.enabled) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const lastPurge = USE_SQLITE ? sqliteGetMeta("consent_retention_last_purge") : lastConsentRetentionPurgeDate;
+  if (lastPurge === today) return;
+
+  try {
+    await purgeExpiredConsentRecords();
+  } catch (error) {
+    console.warn("[Storage] Consent retention purge failed:", error.message);
+  }
+}
+
+function consentRetentionPolicy() {
+  const enabled = CONSENT_RETENTION_DAYS > 0;
+  const cutoffDate = enabled ? new Date(Date.now() - CONSENT_RETENTION_DAYS * 86400000) : null;
+  const policy = {
+    enabled,
+    retentionDays: CONSENT_RETENTION_DAYS,
+    cutoff: cutoffDate ? cutoffDate.toISOString() : null,
+    automaticPurge: enabled ? "daily-on-record-write" : "disabled"
+  };
+  Object.defineProperty(policy, "cutoffDate", {
+    value: cutoffDate,
+    enumerable: false
+  });
+  return policy;
+}
+
+async function countExpiredConsentRecords(cutoff) {
+  if (!cutoff) return 0;
+  if (USE_SQLITE) return sqliteCountExpiredConsentRecords(cutoff);
+  const result = await purgeExpiredConsentRecordsFromJson(cutoff, { dryRun: true });
+  return result.purgedCount;
+}
+
+async function deleteExpiredConsentRecords(cutoff) {
+  if (!cutoff) return 0;
+  if (USE_SQLITE) return sqlitePurgeExpiredConsentRecords(cutoff);
+  const result = await purgeExpiredConsentRecordsFromJson(cutoff);
+  return result.purgedCount;
+}
+
+async function purgeExpiredConsentRecordsFromJson(cutoff, options = {}) {
+  const root = path.join(DATA_DIR, "records");
+  let purgedCount = 0;
+
+  try {
+    const siteDirs = await fs.readdir(root, { withFileTypes: true });
+    for (const siteDir of siteDirs) {
+      if (!siteDir.isDirectory()) continue;
+      let siteId;
+      try {
+        siteId = safeSegment(siteDir.name);
+      } catch (_) {
+        continue;
+      }
+      const dir = path.join(root, siteId);
+      const files = (await fs.readdir(dir, { withFileTypes: true }))
+        .filter((file) => file.isFile() && file.name.endsWith(".log"));
+
+      for (const file of files) {
+        const filePath = path.join(dir, file.name);
+        const content = await fs.readFile(filePath, "utf8");
+        const kept = [];
+        let filePurged = 0;
+
+        for (const line of content.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const record = JSON.parse(line);
+            const ts = new Date(record.ts || record.createdAt || 0);
+            if (!Number.isNaN(ts.getTime()) && ts < cutoff) {
+              filePurged += 1;
+              continue;
+            }
+          } catch (_) {
+            // Preserve malformed lines so retention does not erase unreadable evidence.
+          }
+          kept.push(line);
+        }
+
+        purgedCount += filePurged;
+        if (!options.dryRun && filePurged > 0) {
+          if (kept.length > 0) {
+            await writeText(filePath, `${kept.join("\n")}\n`);
+          } else {
+            await fs.unlink(filePath);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  return { purgedCount };
 }
 
 export async function getConsentHistory(siteId, cid) {
@@ -728,6 +983,30 @@ export async function getConsentReport(siteId, options = {}) {
       decision: rate(uniqueDecisions, totalOutcomes)
     },
     daily: Array.from(daily.values()).sort((a, b) => a.date.localeCompare(b.date))
+  };
+}
+
+export async function getConsentRecordExport(siteId, options = {}) {
+  await ensureInitialData();
+  const safeId = safeSegment(siteId);
+  const range = resolveReportRange(options);
+  const records = (await readConsentRecords(safeId, range.from))
+    .filter((record) => {
+      const ts = new Date(record.ts || record.createdAt || 0);
+      return !Number.isNaN(ts.getTime()) && ts >= range.from && ts <= range.to;
+    })
+    .sort((a, b) => String(a.ts || a.createdAt || "").localeCompare(String(b.ts || b.createdAt || "")));
+
+  return {
+    schemaVersion: 1,
+    siteId: safeId,
+    period: range.label,
+    days: range.days,
+    from: range.from.toISOString(),
+    to: range.to.toISOString(),
+    generatedAt: new Date().toISOString(),
+    recordCount: records.length,
+    records
   };
 }
 
@@ -931,6 +1210,264 @@ export async function getPublicChangelog(siteId) {
 
   const safeId = safeSegment(siteId);
   return readJson(path.join(DATA_DIR, "published", safeId, "changelog.json"), []);
+}
+
+export async function createStorageBackup() {
+  await ensureInitialData();
+  await fs.mkdir(BACKUP_DIR, { recursive: true });
+  const createdAt = new Date();
+  const stamp = createdAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const driver = USE_SQLITE ? "sqlite" : "json";
+  const filename = `owncmp-${driver}-${stamp}${USE_SQLITE ? ".sqlite" : ".json"}`;
+  const backupPath = path.join(BACKUP_DIR, filename);
+
+  if (USE_SQLITE) {
+    getDb().exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    await fs.copyFile(DB_FILE, backupPath);
+  } else {
+    await writeJson(backupPath, await exportJsonBackup());
+  }
+
+  const stat = await fs.stat(backupPath);
+  await appendAudit("storage.backup_created", {
+    filename,
+    driver,
+    size: stat.size
+  });
+
+  return {
+    filename,
+    driver,
+    size: stat.size,
+    createdAt: createdAt.toISOString()
+  };
+}
+
+export async function listStorageBackups() {
+  await fs.mkdir(BACKUP_DIR, { recursive: true });
+  const files = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
+  const backups = [];
+
+  for (const file of files) {
+    if (!file.isFile()) continue;
+    if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}Z\.(sqlite|json)$/.test(file.name)) continue;
+    const filePath = path.join(BACKUP_DIR, file.name);
+    const stat = await fs.stat(filePath);
+    backups.push({
+      filename: file.name,
+      driver: file.name.includes("-sqlite-") ? "sqlite" : "json",
+      size: stat.size,
+      createdAt: stat.birthtime.toISOString(),
+      modifiedAt: stat.mtime.toISOString()
+    });
+  }
+
+  backups.sort((a, b) => String(b.modifiedAt).localeCompare(String(a.modifiedAt)));
+  return backups;
+}
+
+export async function getStorageStatus() {
+  await ensureInitialData();
+  const backups = await listStorageBackups();
+  const retention = await getConsentRetentionStatus();
+  const status = {
+    storageDriver: USE_SQLITE ? "sqlite" : "json",
+    configuredDriver: STORAGE_DRIVER,
+    nodeVersion: process.version,
+    generatedAt: new Date().toISOString(),
+    dataDirectory: DATA_DIR,
+    backupDirectory: BACKUP_DIR,
+    backups: {
+      count: backups.length,
+      latest: backups[0] || null,
+      totalSize: backups.reduce((total, backup) => total + Number(backup.size || 0), 0)
+    },
+    retention: {
+      enabled: retention.enabled,
+      retentionDays: retention.retentionDays,
+      cutoff: retention.cutoff,
+      expiredCount: retention.expiredCount,
+      lastPurgeDate: retention.lastPurgeDate || null
+    },
+    counts: await storageCounts()
+  };
+
+  if (USE_SQLITE) {
+    status.database = await sqliteDatabaseStatus();
+  } else {
+    status.json = await jsonStorageStatus();
+  }
+
+  return status;
+}
+
+async function storageCounts() {
+  if (USE_SQLITE) {
+    return {
+      sites: sqliteTableCount("sites"),
+      activePublishedConfigs: sqliteTableCount("published_configs"),
+      publishedVersions: sqliteTableCount("published_versions"),
+      changelogEntries: sqliteTableCount("changelog"),
+      auditEvents: sqliteTableCount("audit"),
+      consentRecords: sqliteTableCount("consent_records")
+    };
+  }
+
+  const sites = await listSites();
+  const audit = await getAuditLog();
+  const consentRecordCount = await countJsonConsentRecords();
+  const published = await countJsonPublishedFiles();
+  return {
+    sites: sites.length,
+    activePublishedConfigs: published.active,
+    publishedVersions: published.versions,
+    changelogEntries: published.changelogEntries,
+    auditEvents: audit.length,
+    consentRecords: consentRecordCount
+  };
+}
+
+async function sqliteDatabaseStatus() {
+  getDb().exec("PRAGMA wal_checkpoint(PASSIVE)");
+  const dbStat = await optionalStat(DB_FILE);
+  const walStat = await optionalStat(`${DB_FILE}-wal`);
+  const shmStat = await optionalStat(`${DB_FILE}-shm`);
+  return {
+    path: DB_FILE,
+    exists: Boolean(dbStat),
+    size: dbStat?.size || 0,
+    modifiedAt: dbStat?.mtime.toISOString() || null,
+    walSize: walStat?.size || 0,
+    shmSize: shmStat?.size || 0,
+    journalMode: getDb().prepare("PRAGMA journal_mode").get()?.journal_mode || "unknown",
+    foreignKeys: Boolean(getDb().prepare("PRAGMA foreign_keys").get()?.foreign_keys)
+  };
+}
+
+async function jsonStorageStatus() {
+  const stat = await optionalStat(CONFIG_FILE);
+  return {
+    configPath: CONFIG_FILE,
+    configExists: Boolean(stat),
+    configSize: stat?.size || 0,
+    configModifiedAt: stat?.mtime.toISOString() || null,
+    sitesDirectory: SITES_DIR
+  };
+}
+
+async function optionalStat(filePath) {
+  try {
+    return await fs.stat(filePath);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function countJsonConsentRecords() {
+  const root = path.join(DATA_DIR, "records");
+  let count = 0;
+
+  try {
+    const siteDirs = await fs.readdir(root, { withFileTypes: true });
+    for (const siteDir of siteDirs) {
+      if (!siteDir.isDirectory()) continue;
+      const dir = path.join(root, siteDir.name);
+      const files = await fs.readdir(dir, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile() || !file.name.endsWith(".log")) continue;
+        const content = await fs.readFile(path.join(dir, file.name), "utf8");
+        count += content.split("\n").filter((line) => line.trim()).length;
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  return count;
+}
+
+async function countJsonPublishedFiles() {
+  const root = path.join(DATA_DIR, "published");
+  const totals = {
+    active: 0,
+    versions: 0,
+    changelogEntries: 0
+  };
+
+  try {
+    const siteDirs = await fs.readdir(root, { withFileTypes: true });
+    for (const siteDir of siteDirs) {
+      if (!siteDir.isDirectory()) continue;
+      const sitePath = path.join(root, siteDir.name);
+      const files = await fs.readdir(sitePath, { withFileTypes: true });
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith(".json") && file.name !== "changelog.json") totals.active += 1;
+        if (file.isFile() && file.name === "changelog.json") {
+          const changelog = await readJson(path.join(sitePath, file.name), []);
+          totals.changelogEntries += Array.isArray(changelog) ? changelog.length : 0;
+        }
+      }
+
+      const versionsRoot = path.join(sitePath, "versions");
+      try {
+        const environmentDirs = await fs.readdir(versionsRoot, { withFileTypes: true });
+        for (const environmentDir of environmentDirs) {
+          if (!environmentDir.isDirectory()) continue;
+          const versionFiles = await fs.readdir(path.join(versionsRoot, environmentDir.name), { withFileTypes: true });
+          totals.versions += versionFiles.filter((file) => file.isFile() && file.name.endsWith(".json")).length;
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  return totals;
+}
+
+export async function getStorageBackupPath(filename) {
+  const safeName = safeBackupFilename(filename);
+  const backupPath = path.join(BACKUP_DIR, safeName);
+  const relative = path.relative(BACKUP_DIR, backupPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
+
+  try {
+    const stat = await fs.stat(backupPath);
+    if (!stat.isFile()) return null;
+    return backupPath;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+export async function restoreStorageBackup(filename) {
+  if (!USE_SQLITE) {
+    throw new Error("Restore is only available for SQLite storage");
+  }
+
+  await ensureInitialData();
+  const backupPath = await getStorageBackupPath(filename);
+  if (!backupPath || !backupPath.endsWith(".sqlite")) return null;
+
+  const beforeRestore = await createStorageBackup();
+  closeDb();
+  await fs.copyFile(backupPath, DB_FILE);
+  sqliteDb = null;
+  getDb();
+  sqliteAppendAudit("storage.backup_restored", {
+    filename: path.basename(backupPath),
+    safetyBackup: beforeRestore.filename
+  });
+
+  return {
+    filename: path.basename(backupPath),
+    safetyBackup: beforeRestore.filename,
+    restoredAt: new Date().toISOString()
+  };
 }
 
 function cryptoRandomId() {

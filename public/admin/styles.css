@@ -247,6 +247,21 @@ pre {
   font-size: 13px;
 }
 
+.compact-pre {
+  margin-top: 12px;
+  white-space: pre-wrap;
+}
+
+.technical-details {
+  margin-top: 12px;
+}
+
+.technical-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -454,6 +469,24 @@ td .compact {
 .switch-row input {
   width: 18px;
   min-height: 18px;
+}
+
+.logo-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.logo-preview img {
+  max-width: 180px;
+  max-height: 48px;
+  object-fit: contain;
 }
 
 .danger-text {

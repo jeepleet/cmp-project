@@ -1,22 +1,23 @@
 # Project Status
 
-Last updated: 2026-05-10
+Last updated: 2026-05-11
 
 ## Current Stage
 
-Phase 5: Operational Scale and Insights (In Progress).
+Phase 6: Production Deployment Readiness (Next).
 
-The project has moved past the first compliance/integration slice and is now focused on operational scale. Phase 5 now includes multi-site support, the consent reporting dashboard, and SQLite-backed durable storage.
+The project has completed the Phase 5 operational scale slice: multi-site support, consent reporting, and SQLite-backed durable storage. The next phase is preparing the CMP to run on a real website with secure admin operations, backup/restore, deployment documentation, runtime cache/versioning, and launch verification.
 
 ## Current Features
 
-- **Admin Login:** Native Node cookie-based sessions.
+- **Admin Login:** Native Node cookie-based sessions with scrypt password-hash support.
 - **Multi-Site Admin:** Site selector, new-site creation, and optional cloning from the current site.
 - **Site-Scoped Drafts:** Draft configs are stored per site under `data/sites/:siteId/config.json`.
 - **Reporting Dashboard:** Site-scoped accept, reject, partial, and ignore metrics with daily breakdowns.
-- **Config Management:** Draft editor with automatic versioning and Visual Diff before publishing.
-- **Banner Editor:** Customizable copy, colors (theme), and layout (position).
-- **Consent Logic:** Google Consent Mode v2 mapping with Regional Overrides (e.g. EEA).
+- **Consent Retention:** Configurable consent record retention with status and manual purge controls.
+- **Config Management:** Draft editor with automatic versioning, Visual Diff before publishing, active config URLs, and pinned immutable config URLs.
+- **Banner Editor:** Customizable copy, colors, center/default or bottom layout, logo upload, logo alt text, and custom CSS.
+- **Consent Logic:** Google Consent Mode v2 mapping with Regional Overrides (e.g. EEA) and optional Shopify Customer Privacy API sync.
 - **Manual Services:** Service-to-category assignment with automatic cookie cleanup patterns.
 - **Proof of Consent:** Server-side append-only records (JSONL) with persistent Consent IDs (CID).
 - **Transparency:** User Self-Disclosure view showing historical decisions trail.
@@ -43,14 +44,15 @@ The project has moved past the first compliance/integration slice and is now foc
 6. **Maintenance & A11Y:** Established backup points, enforced path consistency, and implemented WCAG 2.1 accessibility enhancements (Focus Trap, ARIA, Keyboard). Fully verified.
 7. **Performance Lab:** Integrated performance instrumentation and dashboard.
 8. **Scanner Helper:** Implemented "Active Console Scanner" for cookie identification. (Note: Needs UX/DB revisit later).
+9. **Phase 5 Scale:** Implemented multi-site support, consent reporting with ignore metrics, and SQLite durable storage.
 
-## Current Milestone In Progress
+## Current Milestone
 
-Phase 5: Operational Scale and Insights.
+Phase 6: Production Deployment Readiness.
 
-Current focus: Finish manual verification of SQLite-backed durable storage before starting the next Phase 5 item.
+Current focus: continue Phase 6 production hardening. Admin auth hardening, HTTPS-aware session cookies, CSRF protection, login rate limiting, SQLite backup/restore, the production environment guide, runtime cache/versioning, consent record retention, consent record export, and Admin storage/status are implemented; next item is final GTM `.tpl` import and template verification.
 
-Implemented in this slice:
+Phase 5 implemented:
 
 - Site index API: `GET /api/sites`
 - Site creation API: `POST /api/sites`
@@ -64,6 +66,37 @@ Implemented in this slice:
 - SQLite storage driver using `data/owncmp.sqlite`
 - One-time import from existing JSON files into SQLite
 - JSON fallback via `CMP_STORAGE=json`
+
+Phase 6 implemented:
+
+- Public immutable config endpoint: `GET /api/public/config/:siteId/:environment/:version`
+- Active production config caching with `ETag`, `Last-Modified`, and `X-OwnCMP-Config-Version`
+- Immutable one-year caching for version-pinned public config URLs
+- Runtime script caching with validators
+- Admin Snippets panel shows both active and pinned production install snippets
+- Consent record retention policy via `CMP_CONSENT_RETENTION_DAYS` with a default of 390 days
+- Authenticated retention status API: `GET /api/consent-retention`
+- Authenticated retention purge API: `POST /api/consent-retention/purge`
+- Admin Storage panel shows retention policy, cutoff, expired count, and manual purge control
+- Consent record export API: `GET /api/exports/consent/:siteId?days=30&format=json`
+- Consent record export supports custom `from=YYYY-MM-DD&to=YYYY-MM-DD` ranges and `json` or `csv` format
+- Admin Reporting panel has JSON and CSV export buttons for the selected site and period
+- Storage status API: `GET /api/storage/status`
+- Admin Storage panel shows data store, database size, consent record count, backup count, and technical details behind an expandable section
+
+Phase 6 planned scope:
+
+- [x] Secure admin authentication hardening with `CMP_ADMIN_PASSWORD_HASH`
+- [x] HTTPS-aware session cookies
+- [x] CSRF protection for admin writes
+- [x] Login rate limiting
+- [x] SQLite backup and restore workflow
+- [x] Production environment configuration guide
+- [x] Runtime cache and versioning strategy
+- [x] Consent record retention policy
+- [x] Consent record export by site/date range
+- [x] Admin storage/status screen
+- Final GTM `.tpl` import and template verification
 
 Reporting definition:
 

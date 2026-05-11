@@ -75,9 +75,11 @@
     var theme = banner.theme || {};
     var root = document.createElement("div");
     root.id = "owncmp-root";
+    root.className = banner.position === "center" ? "owncmp-position-center" : "owncmp-position-bottom";
     root.innerHTML = [
       '<div class="owncmp-backdrop" data-owncmp-close></div>',
       '<section class="owncmp-panel" role="dialog" aria-modal="true" aria-labelledby="owncmp-title" aria-describedby="owncmp-body">',
+      banner.logoDataUrl ? '<div class="owncmp-logo"><img src="' + escapeHtml(banner.logoDataUrl) + '" alt="' + escapeHtml(banner.logoAlt || "") + '"></div>' : "",
       '<div class="owncmp-copy">',
       '<h2 id="owncmp-title">' + escapeHtml(banner.title || "Privacy choices") + "</h2>",
       '<p id="owncmp-body">' + escapeHtml(banner.body || "Choose which cookies and technologies you allow.") + "</p>",
@@ -104,7 +106,7 @@
     root.style.setProperty("--owncmp-primary", theme.primary || "#0f766e");
     root.style.setProperty("--owncmp-neutral", theme.neutral || "#374151");
 
-    injectStyles();
+    injectStyles(banner.customCss);
     appendToBody(root);
     dispatchBannerShown(config, gpcActive);
 
@@ -160,6 +162,7 @@
     var record = buildRecord(config, categories, source, action);
     writeStoredConsent(config, record);
     applyConsent(config, record, source);
+    syncShopifyCustomerPrivacy(config, record);
     dispatchRecord(config, record);
     cleanupDeniedCookies(config, categories);
     closeBanner();
@@ -221,6 +224,44 @@
         body: JSON.stringify(payload)
       }).catch(function() {});
     }
+  }
+
+  function syncShopifyCustomerPrivacy(config, record) {
+    var integration = config.integrations && config.integrations.shopifyCustomerPrivacy;
+    if (!integration || integration.enabled !== true) return;
+    if (!record || record.source !== "user") return;
+
+    var consent = {
+      analytics: Boolean(record.categories && record.categories.analytics),
+      marketing: Boolean(record.categories && record.categories.marketing),
+      preferences: Boolean(record.categories && record.categories.personalization)
+    };
+
+    loadShopifyCustomerPrivacy(function (api) {
+      if (!api || typeof api.setTrackingConsent !== "function") return;
+      api.setTrackingConsent(consent, function () {});
+    });
+  }
+
+  function loadShopifyCustomerPrivacy(callback) {
+    if (window.Shopify && window.Shopify.customerPrivacy) {
+      callback(window.Shopify.customerPrivacy);
+      return;
+    }
+
+    if (!window.Shopify || typeof window.Shopify.loadFeatures !== "function") {
+      callback(null);
+      return;
+    }
+
+    window.Shopify.loadFeatures([
+      {
+        name: "consent-tracking-api",
+        version: "0.1"
+      }
+    ], function (error) {
+      callback(error ? null : window.Shopify && window.Shopify.customerPrivacy);
+    });
   }
 
   function mapGoogleConsent(config, categories) {
@@ -409,7 +450,7 @@
     }).join("");
   }
 
-  function injectStyles() {
+  function injectStyles(customCss) {
     if (document.getElementById("owncmp-style")) return;
     var style = document.createElement("style");
     style.id = "owncmp-style";
@@ -417,12 +458,14 @@
       "#owncmp-root{position:fixed;inset:0;z-index:2147483647;color:var(--owncmp-text);font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.4}",
       ".owncmp-backdrop{position:absolute;inset:0;background:rgba(29,31,36,.18)}",
       ".owncmp-panel{position:absolute;left:16px;right:16px;bottom:16px;max-width:960px;margin:auto;background:var(--owncmp-bg);border:1px solid var(--owncmp-border);border-radius:8px;box-shadow:0 18px 50px rgba(29,31,36,.18);padding:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px}",
+      ".owncmp-position-center .owncmp-panel{top:50%;bottom:auto;transform:translateY(-50%);max-width:720px;grid-template-columns:1fr}",
+      ".owncmp-logo{grid-column:1/-1;margin-bottom:-4px}.owncmp-logo img{display:block;max-width:180px;max-height:64px;object-fit:contain}",
       ".owncmp-copy h2{margin:0 0 8px;font-size:20px;letter-spacing:0}.owncmp-copy p{margin:0;color:var(--owncmp-text)}.owncmp-note{margin-top:10px!important;font-size:13px}",
       ".owncmp-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.owncmp-actions-end{margin-top:14px}",
       ".owncmp-btn{min-height:40px;border-radius:6px;border:1px solid var(--owncmp-border);padding:0 14px;font:inherit;font-weight:700;cursor:pointer}.owncmp-primary{color:#fff;background:var(--owncmp-primary);border-color:var(--owncmp-primary)}.owncmp-neutral{color:#fff;background:var(--owncmp-neutral);border-color:var(--owncmp-neutral)}.owncmp-plain{background:#fff;color:var(--owncmp-text)}",
       ".owncmp-preferences{grid-column:1/-1;border-top:1px solid var(--owncmp-border);padding-top:14px}.owncmp-category-list{display:grid;gap:10px}.owncmp-category{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border:1px solid var(--owncmp-border);border-radius:8px}.owncmp-category small{display:block;margin-top:3px;color:#667085}.owncmp-category input{width:20px;height:20px}",
-      "@media(max-width:720px){.owncmp-panel{grid-template-columns:1fr;left:8px;right:8px;bottom:8px}.owncmp-actions{justify-content:stretch}.owncmp-btn{flex:1 1 140px}}"
-    ].join("");
+      "@media(max-width:720px){.owncmp-panel{grid-template-columns:1fr;left:8px;right:8px;bottom:8px}.owncmp-position-center .owncmp-panel{top:50%;bottom:auto}.owncmp-actions{justify-content:stretch}.owncmp-btn{flex:1 1 140px}}"
+    ].join("") + (customCss ? "\n" + String(customCss) : "");
     document.head.appendChild(style);
   }
 

@@ -58,7 +58,7 @@ The runtime contract does not depend on the storage driver. A later Postgres dri
 
 ### Admin UI
 
-The admin UI in `public/admin` is a vanilla web app. It has a site selector, a new-site flow, and guarded switching when draft changes are unsaved. For the selected site, it edits banner copy, colors, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
+The admin UI in `public/admin` is a vanilla web app. It has a site selector, a new-site flow, and guarded switching when draft changes are unsaved. For the selected site, it edits banner copy, colors, placement, logo, custom CSS, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
 
 ### Public config endpoint
 
@@ -69,6 +69,27 @@ The runtime fetches:
 ```
 
 The response is public by design. It should contain only configuration that is safe for browsers to read.
+
+Active production config responses use short public caching with validators:
+
+- `Cache-Control: public, max-age=60, stale-while-revalidate=300, must-revalidate`
+- `ETag`
+- `Last-Modified`
+- `X-OwnCMP-Config-Version`
+
+Published immutable versions are also exposed at:
+
+```text
+/api/public/config/:siteId/:environment/:version
+```
+
+Those responses are safe to cache long-term because the version is part of the URL:
+
+```text
+Cache-Control: public, max-age=31536000, immutable
+```
+
+Use the active URL when a site should automatically receive the newest production publish. Use the version-pinned URL when a launch needs a frozen config that changes only when the snippet is updated.
 
 The special `preview` environment returns the requested site's current draft config and requires an active admin session.
 
@@ -99,6 +120,27 @@ The runtime records `banner_shown` when the banner appears and `decision` when a
 
 Reporting uses latest decision per `cid` for headline Accept, Reject, and Partial counts. Ignore is calculated as banner `cid`s without a matching decision in the selected period. Outcome percentages use tracked outcomes as the denominator: Accept + Reject + Partial + Other + Ignore. Response rate is calculated separately as decisions with a matching banner view divided by banner views. This is a practical no-interaction metric, not a browser-level unique-user identity.
 
+Consent records are subject to a configurable retention policy. The default is 390 days, controlled by `CMP_CONSENT_RETENTION_DAYS`. Expired records are purged at most once per day when new consent records arrive, and admins can run the purge manually from the Storage panel.
+
+Raw consent records can be exported by authenticated admins:
+
+```text
+GET /api/exports/consent/:siteId?days=30&format=json
+GET /api/exports/consent/:siteId?from=YYYY-MM-DD&to=YYYY-MM-DD&format=csv
+```
+
+JSON export preserves the full raw record shape. CSV export flattens the common audit fields for spreadsheet review while keeping category and Google consent maps as JSON strings.
+
+### Storage status
+
+Authenticated admins can inspect operational storage state through:
+
+```text
+GET /api/storage/status
+```
+
+The Admin Storage panel uses this endpoint to show user-facing data-store health, database size, consent record count, backup count, and expandable technical details such as Node version, database path, WAL size, record counts, backup totals, and retention status.
+
 ### CMP runtime
 
 `public/cmp/owncmp.js` is the website runtime. It:
@@ -106,7 +148,10 @@ Reporting uses latest decision per `cid` for headline Accept, Reject, and Partia
 - Sets privacy-first Google Consent Mode defaults immediately.
 - Reads stored consent if available.
 - Shows a banner if there is no valid decision.
+- Supports centered default or bottom banner placement.
+- Supports an optional banner logo and site-defined custom banner CSS from config.
 - Updates Google consent state after a user decision.
+- Optionally syncs explicit user choices to Shopify Customer Privacy API when enabled.
 - Pushes one stable dataLayer event shape.
 - Deletes configured cookies only after explicit denial.
 - Notifies `window.OwnCMPGtmBridge` when a GTM bridge is installed.
@@ -134,6 +179,26 @@ data-google-consent="false"
 ```
 
 This keeps Google consent updates inside GTM's consent APIs while the runtime still owns the banner, storage, cookie cleanup, and stable dataLayer event.
+
+### Shopify Customer Privacy API
+
+When enabled in Admin, the runtime loads Shopify's `consent-tracking-api` through `window.Shopify.loadFeatures` when needed and calls:
+
+```js
+window.Shopify.customerPrivacy.setTrackingConsent({
+  analytics: true,
+  marketing: true,
+  preferences: true
+}, callback);
+```
+
+The values are mapped from the visitor's explicit Own CMP choice:
+
+- Own CMP `analytics` -> Shopify `analytics`
+- Own CMP `marketing` -> Shopify `marketing`
+- Own CMP `personalization` -> Shopify `preferences`
+
+The runtime only syncs explicit user choices. It does not automatically write stored consent back into Shopify on page load, and it does not set `sale_of_data` from the normal cookie banner.
 
 ### GTM bridge
 

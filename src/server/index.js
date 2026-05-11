@@ -2,29 +2,45 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import {
+  authMode,
+  checkLoginRateLimit,
   clearSessionCookie,
+  clearLoginFailures,
   createSession,
   destroySession,
   getSession,
+  isSecureRequest,
+  loginRateLimitKey,
+  recordLoginFailure,
   sessionCookie,
   usingDefaultCredentials,
-  verifyCredentials
+  verifyCredentials,
+  verifyCsrfToken
 } from "./auth.js";
 import {
   appendConsentRecord,
+  createStorageBackup,
   createSite,
   ensureInitialData,
   getAuditLog,
   getConfig,
   getConsentHistory,
+  getConsentRecordExport,
   getConsentReport,
+  getConsentRetentionStatus,
   getPublishedConfig,
   getPublishedVersion,
   getPublicChangelog,
+  getStorageStatus,
+  getStorageBackupPath,
+  listStorageBackups,
   listSites,
   listPublishedVersions,
   publishConfig,
+  purgeExpiredConsentRecords,
+  restoreStorageBackup,
   rollbackToVersion,
   saveConfig
 } from "./storage.js";
@@ -62,6 +78,8 @@ server.listen(PORT, () => {
   console.log(`Demo:  http://localhost:${PORT}/demo.html`);
   if (usingDefaultCredentials()) {
     console.log("Using default login admin@example.com / change-me-now");
+  } else if (authMode() === "plaintext-env") {
+    console.warn("Using CMP_ADMIN_PASSWORD plaintext fallback. Prefer CMP_ADMIN_PASSWORD_HASH for production.");
   }
 });
 
@@ -81,23 +99,55 @@ async function handleRequest(req, res) {
 
   if (url.pathname === "/api/login" && req.method === "POST") {
     const body = await readJsonBody(req);
-    if (!verifyCredentials(body.email, body.password)) {
-      sendJson(res, 401, { error: "Invalid login" });
+    const rateLimitKey = loginRateLimitKey(req, body.email);
+    const currentLimit = checkLoginRateLimit(rateLimitKey);
+    if (currentLimit.limited) {
+      sendJson(res, 429, {
+        error: "Too many login attempts",
+        retryAfterSeconds: currentLimit.retryAfterSeconds
+      }, {
+        "Retry-After": String(currentLimit.retryAfterSeconds)
+      });
       return;
     }
 
+    if (!verifyCredentials(body.email, body.password)) {
+      const nextLimit = recordLoginFailure(rateLimitKey);
+      const headers = nextLimit.limited
+        ? { "Retry-After": String(nextLimit.retryAfterSeconds) }
+        : {};
+      const status = nextLimit.limited ? 429 : 401;
+      const message = nextLimit.limited ? "Too many login attempts" : "Invalid login";
+      sendJson(res, status, {
+        error: message,
+        retryAfterSeconds: nextLimit.retryAfterSeconds || 0
+      }, headers);
+      return;
+    }
+
+    clearLoginFailures(rateLimitKey);
     const token = createSession(body.email);
-    sendJson(res, 200, { ok: true, email: body.email }, {
-      "Set-Cookie": sessionCookie(token)
+    const session = getSession({ headers: { cookie: sessionCookie(token) } });
+    const secureCookies = isSecureRequest(req);
+    sendJson(res, 200, {
+      ok: true,
+      email: body.email,
+      csrfToken: session?.csrfToken || null,
+      authMode: authMode()
+    }, {
+      "Set-Cookie": sessionCookie(token, { secure: secureCookies })
     });
     return;
   }
 
   if (url.pathname === "/api/logout" && req.method === "POST") {
-    const session = getSession(req);
+    const session = requireAuth(req, res);
+    if (!session) return;
+    if (!requireCsrf(req, res, session)) return;
     if (session) destroySession(session.token);
+    const secureCookies = isSecureRequest(req);
     sendJson(res, 200, { ok: true }, {
-      "Set-Cookie": clearSessionCookie()
+      "Set-Cookie": clearSessionCookie({ secure: secureCookies })
     });
     return;
   }
@@ -107,7 +157,10 @@ async function handleRequest(req, res) {
     sendJson(res, 200, {
       authenticated: Boolean(session),
       email: session?.email || null,
-      usingDefaultCredentials: usingDefaultCredentials()
+      csrfToken: session?.csrfToken || null,
+      usingDefaultCredentials: usingDefaultCredentials(),
+      authMode: authMode(),
+      secureCookies: isSecureRequest(req)
     });
     return;
   }
@@ -119,7 +172,8 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === "/api/sites" && req.method === "POST") {
-    if (!requireAuth(req, res)) return;
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
     try {
       const body = await readJsonBody(req);
       sendJson(res, 201, await createSite(body));
@@ -142,7 +196,8 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === "/api/config" && req.method === "PUT") {
-    if (!requireAuth(req, res)) return;
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
     const body = await readJsonBody(req);
     sendJson(res, 200, await saveConfig(body));
     return;
@@ -161,14 +216,16 @@ async function handleRequest(req, res) {
   }
 
   if (adminConfigMatch && req.method === "PUT") {
-    if (!requireAuth(req, res)) return;
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
     const body = await readJsonBody(req);
     sendJson(res, 200, await saveConfig(body, adminConfigMatch[1]));
     return;
   }
 
   if (url.pathname === "/api/publish" && req.method === "POST") {
-    if (!requireAuth(req, res)) return;
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
     const body = await readJsonBody(req);
     sendJson(res, 200, await publishConfig(body));
     return;
@@ -196,7 +253,8 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === "/api/rollback" && req.method === "POST") {
-    if (!requireAuth(req, res)) return;
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
     const body = await readJsonBody(req);
     const restored = await rollbackToVersion(body.siteId, body.environment || "production", body.version);
     if (!restored) {
@@ -213,6 +271,71 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/backups" && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    sendJson(res, 200, await listStorageBackups());
+    return;
+  }
+
+  if (url.pathname === "/api/backups" && req.method === "POST") {
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
+    sendJson(res, 201, await createStorageBackup());
+    return;
+  }
+
+  if (url.pathname === "/api/storage/status" && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    sendJson(res, 200, await getStorageStatus());
+    return;
+  }
+
+  if (url.pathname === "/api/consent-retention" && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    sendJson(res, 200, await getConsentRetentionStatus());
+    return;
+  }
+
+  if (url.pathname === "/api/consent-retention/purge" && req.method === "POST") {
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
+    sendJson(res, 200, await purgeExpiredConsentRecords());
+    return;
+  }
+
+  const backupDownloadMatch = url.pathname.match(/^\/api\/backups\/([^/]+)\/download$/);
+  if (backupDownloadMatch && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    const backupPath = await getStorageBackupPath(backupDownloadMatch[1]);
+    if (!backupPath) {
+      sendJson(res, 404, { error: "Backup not found" });
+      return;
+    }
+    await sendFile(res, backupPath, {
+      "Content-Type": "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${path.basename(backupPath)}"`,
+      "Cache-Control": "no-store"
+    });
+    return;
+  }
+
+  const backupRestoreMatch = url.pathname.match(/^\/api\/backups\/([^/]+)\/restore$/);
+  if (backupRestoreMatch && req.method === "POST") {
+    const session = requireAuth(req, res);
+    if (!session || !requireCsrf(req, res, session)) return;
+    try {
+      const restored = await restoreStorageBackup(backupRestoreMatch[1]);
+      if (!restored) {
+        sendJson(res, 404, { error: "Backup not found" });
+        return;
+      }
+      sendJson(res, 200, restored);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || "Restore failed" });
+    }
+    return;
+  }
+
   const reportMatch = url.pathname.match(/^\/api\/reports\/consent\/([^/]+)$/);
   if (reportMatch && req.method === "GET") {
     if (!requireAuth(req, res)) return;
@@ -220,6 +343,46 @@ async function handleRequest(req, res) {
     const from = url.searchParams.get("from") || "";
     const to = url.searchParams.get("to") || "";
     sendJson(res, 200, await getConsentReport(reportMatch[1], { days, from, to }));
+    return;
+  }
+
+  const exportMatch = url.pathname.match(/^\/api\/exports\/consent\/([^/]+)$/);
+  if (exportMatch && req.method === "GET") {
+    if (!requireAuth(req, res)) return;
+    const siteId = safeSegment(exportMatch[1]);
+    const days = url.searchParams.get("days") || 30;
+    const from = url.searchParams.get("from") || "";
+    const to = url.searchParams.get("to") || "";
+    const format = String(url.searchParams.get("format") || "json").toLowerCase();
+    const payload = await getConsentRecordExport(siteId, { days, from, to });
+    const datePart = `${payload.from.slice(0, 10)}_${payload.to.slice(0, 10)}`;
+
+    if (format === "csv") {
+      sendDownload(res, consentExportCsv(payload), {
+        contentType: "text/csv; charset=utf-8",
+        filename: `owncmp-consent-${siteId}-${datePart}.csv`
+      });
+      return;
+    }
+
+    sendDownload(res, `${JSON.stringify(payload, null, 2)}\n`, {
+      contentType: "application/json; charset=utf-8",
+      filename: `owncmp-consent-${siteId}-${datePart}.json`
+    });
+    return;
+  }
+
+  const publicVersionedConfigMatch = url.pathname.match(/^\/api\/public\/config\/([^/]+)\/([^/]+)\/([^/]+)$/);
+  if (publicVersionedConfigMatch && req.method === "GET") {
+    const [, siteId, environment, version] = publicVersionedConfigMatch;
+    const config = await getPublishedVersion(siteId, environment, version);
+    if (!config) {
+      sendJson(res, 404, { error: "Published config version not found" }, corsHeaders());
+      return;
+    }
+    sendCacheableJson(req, res, 200, config, corsHeaders(configCacheHeaders(config, {
+      immutable: true
+    })));
     return;
   }
 
@@ -246,9 +409,7 @@ async function handleRequest(req, res) {
       sendJson(res, 404, { error: "Published config not found" }, corsHeaders());
       return;
     }
-    sendJson(res, 200, config, corsHeaders({
-      "Cache-Control": "public, max-age=60"
-    }));
+    sendCacheableJson(req, res, 200, config, corsHeaders(configCacheHeaders(config)));
     return;
   }
 
@@ -256,7 +417,7 @@ async function handleRequest(req, res) {
   if (publicChangelogMatch && req.method === "GET") {
     const siteId = safeSegment(publicChangelogMatch[1]);
     const changelog = await getPublicChangelog(siteId);
-    sendJson(res, 200, changelog, corsHeaders({
+    sendCacheableJson(req, res, 200, changelog, corsHeaders({
       "Cache-Control": "public, max-age=300"
     }));
     return;
@@ -299,13 +460,13 @@ async function handleRequest(req, res) {
   if (url.pathname === "/api/public/cookie-db" && req.method === "GET") {
     const dbPath = path.join(SRC_DIR, "server", "cookie-db.json");
     const db = await readJsonFile(dbPath, []);
-    sendJson(res, 200, db, corsHeaders({
+    sendCacheableJson(req, res, 200, db, corsHeaders({
       "Cache-Control": "public, max-age=3600"
     }));
     return;
   }
 
-  await serveStatic(url.pathname, res);
+  await serveStatic(req, url.pathname, res);
 }
 
 function requireAuth(req, res) {
@@ -313,6 +474,12 @@ function requireAuth(req, res) {
   if (session) return session;
   sendJson(res, 401, { error: "Authentication required" });
   return null;
+}
+
+function requireCsrf(req, res, session) {
+  if (verifyCsrfToken(req, session)) return true;
+  sendJson(res, 403, { error: "Invalid CSRF token" });
+  return false;
 }
 
 async function readJsonBody(req) {
@@ -343,6 +510,20 @@ async function readJsonFile(filePath, fallback) {
   }
 }
 
+async function sendFile(res, filePath, headers = {}) {
+  try {
+    const content = await fs.readFile(filePath);
+    res.writeHead(200, headers);
+    res.end(content);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      sendJson(res, 404, { error: "Not found" });
+      return;
+    }
+    throw error;
+  }
+}
+
 function safeSegment(value) {
   const segment = String(value || "").trim();
   if (!/^[a-zA-Z0-9_-]+$/.test(segment)) {
@@ -360,6 +541,118 @@ function sendJson(res, statusCode, value, headers = {}) {
   res.end(JSON.stringify(value));
 }
 
+function sendDownload(res, body, options = {}) {
+  res.writeHead(200, {
+    "Content-Type": options.contentType || "application/octet-stream",
+    "Content-Disposition": `attachment; filename="${options.filename || "download"}"`,
+    "Cache-Control": "no-store"
+  });
+  res.end(body);
+}
+
+function consentExportCsv(payload) {
+  const rows = [[
+    "ts",
+    "siteId",
+    "cid",
+    "type",
+    "action",
+    "source",
+    "configVersion",
+    "categories",
+    "googleConsent",
+    "userAgent"
+  ]];
+
+  for (const record of payload.records || []) {
+    rows.push([
+      record.ts || record.createdAt || "",
+      record.siteId || payload.siteId || "",
+      record.cid || "",
+      record.type || (record.categories ? "decision" : "unknown"),
+      record.action || "",
+      record.source || "",
+      record.configVersion || "",
+      record.categories ? JSON.stringify(record.categories) : "",
+      record.googleConsent ? JSON.stringify(record.googleConsent) : "",
+      record.ua || ""
+    ]);
+  }
+
+  return `${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function sendCacheableJson(req, res, statusCode, value, headers = {}) {
+  const body = JSON.stringify(value);
+  const etag = weakEtag(body);
+  const lastModified = cacheLastModified(value);
+  const responseHeaders = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "public, max-age=60, must-revalidate",
+    ETag: etag,
+    ...headers
+  };
+
+  if (lastModified) responseHeaders["Last-Modified"] = lastModified;
+
+  if (isFresh(req, etag, lastModified)) {
+    res.writeHead(304, responseHeaders);
+    res.end();
+    return;
+  }
+
+  res.writeHead(statusCode, responseHeaders);
+  res.end(body);
+}
+
+function configCacheHeaders(config, options = {}) {
+  const lastModified = cacheLastModified(config);
+  const headers = {
+    "Cache-Control": options.immutable
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=60, stale-while-revalidate=300, must-revalidate",
+    "X-OwnCMP-Config-Version": String(config.version || "unknown"),
+    "Access-Control-Expose-Headers": "ETag, Last-Modified, X-OwnCMP-Config-Version"
+  };
+
+  if (lastModified) headers["Last-Modified"] = lastModified;
+  return headers;
+}
+
+function cacheLastModified(value) {
+  const source = Array.isArray(value)
+    ? value[0]?.publishedAt || value[0]?.lastPublishedAt || null
+    : value?.lastPublishedAt || value?.updatedAt || value?.publishedAt || null;
+  if (!source) return null;
+  const date = new Date(source);
+  return Number.isNaN(date.getTime()) ? null : date.toUTCString();
+}
+
+function weakEtag(body) {
+  return `W/"${createHash("sha256").update(body).digest("base64url").slice(0, 24)}"`;
+}
+
+function isFresh(req, etag, lastModified) {
+  const ifNoneMatch = req.headers["if-none-match"];
+  if (ifNoneMatch && ifNoneMatch.split(",").map((value) => value.trim()).includes(etag)) {
+    return true;
+  }
+
+  const ifModifiedSince = req.headers["if-modified-since"];
+  if (ifModifiedSince && lastModified) {
+    const since = new Date(ifModifiedSince);
+    const modified = new Date(lastModified);
+    return !Number.isNaN(since.getTime()) && !Number.isNaN(modified.getTime()) && modified <= since;
+  }
+
+  return false;
+}
+
 function redirect(res, location) {
   res.writeHead(302, { Location: location });
   res.end();
@@ -369,12 +662,12 @@ function corsHeaders(extra = {}) {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, If-None-Match, If-Modified-Since",
     ...extra
   };
 }
 
-async function serveStatic(requestPath, res) {
+async function serveStatic(req, requestPath, res) {
   let pathname = decodeURIComponent(requestPath);
 
   if (pathname === "/admin") {
@@ -395,14 +688,25 @@ async function serveStatic(requestPath, res) {
 
   try {
     const content = await fs.readFile(filePath);
+    const stat = await fs.stat(filePath);
     const extension = path.extname(filePath).toLowerCase();
+    const etag = weakEtag(content);
+    const lastModified = stat.mtime.toUTCString();
     const headers = {
-      "Content-Type": MIME_TYPES[extension] || "application/octet-stream"
+      "Content-Type": MIME_TYPES[extension] || "application/octet-stream",
+      ETag: etag,
+      "Last-Modified": lastModified
     };
 
     if (pathname.startsWith("/cmp/")) {
-      headers["Cache-Control"] = "public, max-age=300";
+      headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=86400";
       headers["Access-Control-Allow-Origin"] = "*";
+    }
+
+    if (isFresh(req, etag, lastModified)) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
     }
 
     res.writeHead(200, headers);

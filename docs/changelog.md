@@ -1,9 +1,59 @@
 # Changelog
 
+## 2026-05-11
+
+### Added
+
+- Banner position controls for centered or bottom display, with centered as the default for new configs.
+- Banner logo upload, preview, removal, and alt text in Admin.
+- Runtime rendering for uploaded banner logos.
+- Custom banner CSS field in Admin and runtime support for config-defined CSS.
+- Shopify Customer Privacy API toggle in the Consent section.
+- Runtime sync from explicit Own CMP user choices to Shopify `setTrackingConsent` for analytics, marketing, and preferences.
+- Consent record retention policy with `CMP_CONSENT_RETENTION_DAYS` defaulting to 390 days.
+- Authenticated retention status endpoint: `GET /api/consent-retention`.
+- Authenticated retention purge endpoint: `POST /api/consent-retention/purge`.
+- Daily opportunistic purge of expired consent records when new consent records are written.
+- Admin Storage panel retention summary with policy, cutoff, expired count, and manual purge control.
+- Consent record export endpoint: `GET /api/exports/consent/:siteId`.
+- Consent record export support for `days`, custom `from` / `to`, and `json` / `csv` formats.
+- Admin Reporting panel JSON and CSV export buttons for the selected site and period.
+- Storage status endpoint: `GET /api/storage/status`.
+- Admin Storage panel status cards for driver, database size, consent records, and backups.
+- Admin Storage details for Node version, data paths, database path, WAL size, record counts, backup totals, and retention state.
+- Public immutable config endpoint: `GET /api/public/config/:siteId/:environment/:version`.
+- Long-cache headers for version-pinned public config responses.
+- `ETag`, `Last-Modified`, and `X-OwnCMP-Config-Version` headers for public config responses.
+- Conditional `304 Not Modified` support for cacheable JSON responses and static runtime assets.
+- Active and pinned production runtime snippets in the Admin Snippets panel.
+- Runtime cache and versioning guidance in README, architecture, status, roadmap, production environment, GTM, WordPress, and Shopify docs.
+
+### Changed
+
+- Admin Storage now uses user-facing data-store wording and hides operational technical details behind a "Technical details" disclosure.
+- Removed the Admin Launch panel and launch-checklist API because the section duplicated production docs and added UI noise.
+- Custom banner CSS textarea is empty by default.
+- Public active config responses now use short public caching with revalidation instead of plain `max-age=60`.
+- `/cmp/owncmp.js` now returns cache validators and short public caching.
+- Phase 6 status now marks runtime cache/versioning, consent record retention, consent record export, and Admin storage/status as completed.
+
 ## 2026-05-10
 
 ### Added
 
+- Roadmap Phase 6: Production Deployment Readiness.
+- Phase 6 scope covering admin security, HTTPS/session hardening, CSRF protection, rate limiting, backup/restore, deployment guidance, runtime cache/versioning, retention/export, storage status, launch checklist, and final GTM verification.
+- Scrypt admin password hash support via `CMP_ADMIN_PASSWORD_HASH`.
+- Password hash generation helper at `src/server/hash-password.js`.
+- HTTPS-aware admin session cookies that add `Secure` for HTTPS/proxy requests.
+- `CMP_FORCE_SECURE_COOKIES=true` override for deployments that must force secure session cookies.
+- Per-session CSRF tokens for authenticated admin sessions.
+- CSRF protection on admin write endpoints, including save config, publish, rollback, create site, and logout.
+- In-memory login rate limiting for repeated failed admin login attempts.
+- SQLite backup and restore workflow.
+- Admin Storage panel for creating, listing, downloading, and restoring backups.
+- Automatic safety backup before restoring a SQLite backup.
+- Production environment configuration guide in `docs/production-environment.md`.
 - Phase 5 multi-site foundation with a site index at `data/sites/index.json`.
 - Site-scoped draft config storage at `data/sites/:siteId/config.json`.
 - Authenticated site listing API: `GET /api/sites`.
@@ -33,6 +83,13 @@
 - Reporting percentages now use tracked outcomes as the denominator instead of banner views, preventing legacy decision records from showing rates above 100%.
 - Storage now defaults to SQLite instead of local JSON files.
 - Node engine requirement changed to Node.js 25+ because the SQLite driver uses native `node:sqlite`.
+- Project status now marks Phase 5 as completed and Phase 6 as the next milestone.
+- Production admin setup now prefers password hashes instead of plaintext `CMP_ADMIN_PASSWORD`.
+- Admin session responses now expose whether secure cookies are active for the current request.
+- Admin UI now sends `X-CSRF-Token` automatically for unsafe API requests.
+- Failed admin login attempts now return `429 Too Many Requests` with `Retry-After` after the configured threshold.
+- Backup files are stored under `data/backups`.
+- README now links the production environment guide.
 
 ## 2026-05-08
 

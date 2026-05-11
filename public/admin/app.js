@@ -5,6 +5,9 @@ const state = {
   selectedSiteId: null,
   versions: [],
   report: null,
+  backups: [],
+  retention: null,
+  storageStatus: null,
   dirty: false,
   session: null
 };
@@ -73,6 +76,7 @@ function bindLogin() {
           password: formData.get("password")
         }
       });
+      state.session = session;
       updateUserInfo(session);
       await loadSitesAndConfig();
       showApp();
@@ -114,7 +118,12 @@ function bindActions() {
   safeListen("#add-service-button", "click", addService);
   safeListen("#add-override-button", "click", addRegionalOverride);
   safeListen("#refresh-history-button", "click", loadVersionsAndRender);
+  safeListen("#refresh-backups-button", "click", loadBackupsAndRender);
+  safeListen("#create-backup-button", "click", createBackup);
+  safeListen("#purge-retention-button", "click", purgeExpiredConsentRecords);
   safeListen("#refresh-report-button", "click", loadReportAndRender);
+  safeListen("#export-consent-json-button", "click", () => exportConsentRecords("json"));
+  safeListen("#export-consent-csv-button", "click", () => exportConsentRecords("csv"));
   safeListen("#report-period", "change", handleReportPeriodChange);
   safeListen("#report-from", "change", loadReportAndRender);
   safeListen("#report-to", "change", loadReportAndRender);
@@ -127,6 +136,15 @@ function bindActions() {
   safeListen("#gpc-enabled", "change", (event) => {
     if (state.config) {
       state.config.gpc.enabled = event.target.checked;
+      markDirty();
+    }
+  });
+
+  safeListen("#shopify-privacy-enabled", "change", (event) => {
+    if (state.config) {
+      state.config.integrations = state.config.integrations || {};
+      state.config.integrations.shopifyCustomerPrivacy = state.config.integrations.shopifyCustomerPrivacy || {};
+      state.config.integrations.shopifyCustomerPrivacy.enabled = event.target.checked;
       markDirty();
     }
   });
@@ -149,11 +167,21 @@ function bindActions() {
   safeListen("#banner-form", "input", (event) => {
     const target = event.target;
     if (!target.name || !state.config) return;
+    if (target.name === "banner.positionCenter" || target.name === "banner.positionBottom") {
+      state.config.banner.position = target.name === "banner.positionBottom" && target.checked ? "bottom" : "center";
+      markDirty();
+      renderBannerForm();
+      renderOverview();
+      renderSnippets();
+      return;
+    }
     setPath(state.config, target.name, target.value);
     markDirty();
     renderOverview();
     renderSnippets();
   });
+
+  safeListen("#banner-logo-upload", "change", handleBannerLogoUpload);
 }
 
 async function loadSitesAndConfig(preferredSiteId = null) {
@@ -173,7 +201,7 @@ async function loadConfig(siteId = state.selectedSiteId) {
   state.selectedSiteId = siteId;
   localStorage.setItem("owncmp.selectedSiteId", siteId);
   state.config = await api(`/api/config/${encodeURIComponent(siteId)}`);
-  await Promise.all([loadActiveConfig(), loadVersions(), loadReport()]);
+  await Promise.all([loadActiveConfig(), loadVersions(), loadReport(), loadBackups(), loadRetention(), loadStorageStatus()]);
   state.dirty = false;
   renderSiteSelector();
   renderAll();
@@ -215,6 +243,40 @@ async function loadReportAndRender() {
   renderReport();
 }
 
+async function loadBackups() {
+  try {
+    state.backups = await api("/api/backups");
+  } catch (error) {
+    console.error("Failed to load backups:", error);
+    state.backups = [];
+  }
+}
+
+async function loadRetention() {
+  try {
+    state.retention = await api("/api/consent-retention");
+  } catch (error) {
+    console.error("Failed to load retention status:", error);
+    state.retention = null;
+  }
+}
+
+async function loadStorageStatus() {
+  try {
+    state.storageStatus = await api("/api/storage/status");
+  } catch (error) {
+    console.error("Failed to load storage status:", error);
+    state.storageStatus = null;
+  }
+}
+
+async function loadBackupsAndRender() {
+  await Promise.all([loadBackups(), loadRetention(), loadStorageStatus()]);
+  renderStorageStatus();
+  renderBackups();
+  renderRetention();
+}
+
 function handleReportPeriodChange() {
   const isCustom = qs("#report-period")?.value === "custom";
   qsa(".report-custom-range").forEach((field) => {
@@ -244,6 +306,14 @@ function reportQuery() {
   return `days=${encodeURIComponent(period)}`;
 }
 
+function exportConsentRecords(format) {
+  if (!state.config?.siteId) return;
+  const params = new URLSearchParams(reportQuery());
+  params.set("format", format);
+  const url = `/api/exports/consent/${encodeURIComponent(state.config.siteId)}?${params.toString()}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 function renderAll() {
   renderSiteSelector();
   renderBannerForm();
@@ -251,6 +321,9 @@ function renderAll() {
   renderCategories();
   renderServices();
   renderReport();
+  renderStorageStatus();
+  renderBackups();
+  renderRetention();
   renderDiff();
   renderHistory();
   renderSnippets();
@@ -316,8 +389,65 @@ async function createSite() {
 function renderBannerForm() {
   const form = qs("#banner-form");
   qsa("[name]", form).forEach((input) => {
+    if (input.name === "banner.positionCenter") {
+      input.checked = getPath(state.config, "banner.position") === "center";
+      return;
+    }
+    if (input.name === "banner.positionBottom") {
+      input.checked = getPath(state.config, "banner.position") === "bottom";
+      return;
+    }
     input.value = getPath(state.config, input.name) ?? "";
   });
+  renderLogoPreview();
+}
+
+function renderLogoPreview() {
+  const target = qs("#banner-logo-preview");
+  if (!target) return;
+  const logo = state.config?.banner?.logoDataUrl || "";
+  if (!logo) {
+    target.innerHTML = '<span>No logo uploaded.</span>';
+    return;
+  }
+
+  target.innerHTML = `
+    <img src="${escapeHtml(logo)}" alt="${escapeHtml(state.config.banner.logoAlt || "Banner logo")}">
+    <button class="button subtle" id="remove-banner-logo-button" type="button">Remove logo</button>
+  `;
+  qs("#remove-banner-logo-button")?.addEventListener("click", () => {
+    state.config.banner.logoDataUrl = "";
+    state.config.banner.logoAlt = "";
+    markDirty();
+    renderBannerForm();
+  });
+}
+
+function handleBannerLogoUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file || !state.config) return;
+  if (!file.type.startsWith("image/")) {
+    alert("Please upload an image file.");
+    event.target.value = "";
+    return;
+  }
+  if (file.size > 200 * 1024) {
+    alert("Logo file is too large. Use an image under 200 KB.");
+    event.target.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    state.config.banner.logoDataUrl = String(reader.result || "");
+    if (!state.config.banner.logoAlt) {
+      state.config.banner.logoAlt = state.config.siteName || "Banner logo";
+    }
+    markDirty();
+    renderBannerForm();
+  });
+  reader.readAsDataURL(file);
+  event.target.value = "";
 }
 
 function renderOverview() {
@@ -380,6 +510,7 @@ function renderDiff() {
 
 function renderCategories() {
   qs("#gpc-enabled").checked = Boolean(state.config.gpc.enabled);
+  qs("#shopify-privacy-enabled").checked = Boolean(state.config.integrations?.shopifyCustomerPrivacy?.enabled);
   qs("#consent-ttl").value = state.config.consentTtlDays;
   qs("#datalayer-event").value = state.config.dataLayer.eventName;
 
@@ -605,6 +736,154 @@ function renderHistory() {
   });
 }
 
+function renderBackups() {
+  const rows = qs("#backup-rows");
+  if (!rows) return;
+
+  if (!state.backups.length) {
+    rows.innerHTML = '<tr><td colspan="5" class="empty-state">No backups created yet.</td></tr>';
+    return;
+  }
+
+  rows.innerHTML = state.backups.map((backup) => `
+    <tr>
+      <td><strong>${escapeHtml(backup.filename)}</strong></td>
+      <td>${escapeHtml(backup.driver)}</td>
+      <td>${formatBytes(backup.size)}</td>
+      <td>${formatDate(backup.modifiedAt || backup.createdAt)}</td>
+      <td class="row-actions">
+        <a class="button subtle" href="/api/backups/${encodeURIComponent(backup.filename)}/download" target="_blank" rel="noreferrer">Download</a>
+        <button class="button" data-restore-backup="${escapeHtml(backup.filename)}" type="button">Restore</button>
+      </td>
+    </tr>
+  `).join("");
+
+  qsa("[data-restore-backup]").forEach((button) => {
+    button.addEventListener("click", () => restoreBackup(button.dataset.restoreBackup));
+  });
+}
+
+function renderStorageStatus() {
+  const status = state.storageStatus;
+  setText("#storage-driver", status ? (status.storageDriver === "sqlite" ? "Database" : "JSON files") : "-");
+  setText("#storage-size", status ? formatBytes(status.database?.size || status.json?.configSize || 0) : "-");
+  setText("#storage-consent-records", status ? String(status.counts?.consentRecords ?? 0) : "-");
+  setText("#storage-backups", status ? String(status.backups?.count ?? 0) : "-");
+
+  const details = qs("#storage-status-details");
+  if (!details) return;
+
+  if (!status) {
+    details.textContent = "Storage status unavailable.";
+    return;
+  }
+
+  const lines = [
+    `Generated: ${formatDate(status.generatedAt)}`,
+    `Node: ${status.nodeVersion}`,
+    `Data directory: ${status.dataDirectory}`,
+    `Backup directory: ${status.backupDirectory}`,
+    `Sites: ${status.counts?.sites ?? 0}`,
+    `Active published configs: ${status.counts?.activePublishedConfigs ?? 0}`,
+    `Published versions: ${status.counts?.publishedVersions ?? 0}`,
+    `Audit events: ${status.counts?.auditEvents ?? 0}`
+  ];
+
+  if (status.database) {
+    lines.push(`Database path: ${status.database.path}`);
+    lines.push(`Database modified: ${formatDate(status.database.modifiedAt)}`);
+    lines.push(`WAL size: ${formatBytes(status.database.walSize || 0)}`);
+    lines.push(`Journal mode: ${status.database.journalMode}`);
+    lines.push(`Foreign keys: ${status.database.foreignKeys ? "on" : "off"}`);
+  }
+
+  if (status.json) {
+    lines.push(`Config path: ${status.json.configPath}`);
+    lines.push(`Config modified: ${formatDate(status.json.configModifiedAt)}`);
+    lines.push(`Sites directory: ${status.json.sitesDirectory}`);
+  }
+
+  if (status.backups?.latest) {
+    lines.push(`Latest backup: ${status.backups.latest.filename}`);
+    lines.push(`Latest backup modified: ${formatDate(status.backups.latest.modifiedAt)}`);
+    lines.push(`Total backup size: ${formatBytes(status.backups.totalSize || 0)}`);
+  }
+
+  details.textContent = lines.join("\n");
+}
+
+function renderRetention() {
+  const policy = qs("#retention-policy");
+  const cutoff = qs("#retention-cutoff");
+  const expired = qs("#retention-expired");
+  const button = qs("#purge-retention-button");
+  if (!policy || !cutoff || !expired) return;
+
+  if (!state.retention) {
+    policy.textContent = "Unavailable";
+    cutoff.textContent = "-";
+    expired.textContent = "-";
+    if (button) button.disabled = true;
+    return;
+  }
+
+  policy.textContent = state.retention.enabled
+    ? `${state.retention.retentionDays} days`
+    : "Disabled";
+  cutoff.textContent = state.retention.cutoff ? formatDate(state.retention.cutoff) : "-";
+  expired.textContent = String(state.retention.expiredCount ?? 0);
+  if (button) button.disabled = !state.retention.enabled || Number(state.retention.expiredCount || 0) === 0;
+}
+
+async function createBackup() {
+  try {
+    const backup = await api("/api/backups", { method: "POST" });
+    await loadBackups();
+    await loadStorageStatus();
+    await loadRetention();
+    renderStorageStatus();
+    renderBackups();
+    renderRetention();
+    alert(`Backup created: ${backup.filename}`);
+  } catch (error) {
+    alert("Backup failed: " + error.message);
+  }
+}
+
+async function purgeExpiredConsentRecords() {
+  if (!state.retention?.enabled) return;
+  const count = Number(state.retention.expiredCount || 0);
+  if (count <= 0) return;
+  if (!window.confirm(`Purge ${count} expired consent record(s)? This cannot be undone unless you restore a backup.`)) return;
+
+  try {
+    const result = await api("/api/consent-retention/purge", { method: "POST" });
+    await Promise.all([loadRetention(), loadStorageStatus()]);
+    renderStorageStatus();
+    renderRetention();
+    alert(`Purged ${result.purgedCount || 0} expired consent record(s).`);
+  } catch (error) {
+    alert("Retention purge failed: " + error.message);
+  }
+}
+
+async function restoreBackup(filename) {
+  const message = [
+    `Restore backup ${filename}?`,
+    "A safety backup of the current database will be created first.",
+    "The server data will be replaced by the selected backup."
+  ].join("\n\n");
+  if (!window.confirm(message)) return;
+
+  try {
+    const restored = await api(`/api/backups/${encodeURIComponent(filename)}/restore`, { method: "POST" });
+    alert(`Backup restored. Safety backup: ${restored.safetyBackup}`);
+    await loadSitesAndConfig(state.selectedSiteId);
+  } catch (error) {
+    alert("Restore failed: " + error.message);
+  }
+}
+
 function updateService(event) {
   const input = event.target;
   const service = state.config.services[Number(input.dataset.serviceIndex)];
@@ -627,19 +906,39 @@ function updateService(event) {
 
 function renderSnippets() {
   const origin = window.location.origin;
+  const activeVersion = state.activeConfig?.version || "";
+  const activeConfigUrl = `${origin}/api/public/config/${state.config.siteId}/production`;
+  const pinnedConfigUrl = activeVersion
+    ? `${origin}/api/public/config/${state.config.siteId}/production/${activeVersion}`
+    : "";
+
   qs("#script-snippet").textContent = `<script
   src="${origin}/cmp/owncmp.js"
   data-site-id="${state.config.siteId}"
-  data-config-url="${origin}/api/public/config/${state.config.siteId}/production"
+  data-config-url="${activeConfigUrl}"
   defer>
 </script>`;
+
+  qs("#pinned-script-snippet").textContent = activeVersion ? `<script
+  src="${origin}/cmp/owncmp.js"
+  data-site-id="${state.config.siteId}"
+  data-config-url="${pinnedConfigUrl}"
+  defer>
+</script>` : "Publish this site once to generate a pinned production config URL.";
 
   qs("#gtm-script-snippet").textContent = `<script
   src="${origin}/cmp/owncmp.js"
   data-site-id="${state.config.siteId}"
-  data-config-url="${origin}/api/public/config/${state.config.siteId}/production"
+  data-config-url="${activeConfigUrl}"
   data-google-consent="false">
 </script>`;
+
+  qs("#pinned-gtm-script-snippet").textContent = activeVersion ? `<script
+  src="${origin}/cmp/owncmp.js"
+  data-site-id="${state.config.siteId}"
+  data-config-url="${pinnedConfigUrl}"
+  data-google-consent="false">
+</script>` : "Publish this site once to generate a pinned GTM production config URL.";
 
   qs("#gtm-snippet").textContent = `Consent bridge template source: gtm/own-cmp-consent-mode-template-code.js
 Trigger: Consent Initialization - All Pages
@@ -912,6 +1211,7 @@ async function logout() {
   state.config = null;
   state.activeConfig = null;
   state.sites = [];
+  state.session = null;
   state.selectedSiteId = null;
   showLogin();
 }
@@ -938,11 +1238,17 @@ function showApp() {
 }
 
 async function api(url, options = {}) {
+  const method = options.method || "GET";
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (!["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase()) && state.session?.csrfToken) {
+    headers["X-CSRF-Token"] = state.session.csrfToken;
+  }
+
   const response = await fetch(url, {
-    method: options.method || "GET",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    method,
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined
   });
 
@@ -1026,6 +1332,13 @@ function formatDate(value) {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function formatRate(value) {
