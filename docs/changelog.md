@@ -12,6 +12,7 @@
 - Localized "View my consent data" banner link and disclosure page text.
 - Banner corner style control with round, semi-round, and square options.
 - Roadmap Phase 7 for real website go-live, covering hosting, deployment, persistence, monitoring, and live verification.
+- Complete Phase 7 Railway + Cloudflare go-live runbook with volume path, environment variables, DNS, cache rules, security rules, snippets, verification, backups, monitoring, and rollback.
 
 ## 2026-05-11
 

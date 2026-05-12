@@ -63,11 +63,13 @@
 
 ## Phase 7: Real Website Go-Live
 
-- Select production hosting model and region
+- Use Railway as the first production host
+- Use Cloudflare for DNS, TLS edge, CDN cache rules, and basic protection
 - Resolve production Node runtime strategy: verify Node 24 LTS compatibility or pin a supported deployment image deliberately
-- Containerize or otherwise package the Node runtime for repeatable deploys
-- Provision persistent storage for `data/owncmp.sqlite`, backups, and published configs
-- Configure HTTPS, domain, reverse proxy, and security headers
+- Mount Railway persistent storage at `/app/data` for `data/owncmp.sqlite`, backups, and published configs
+- Configure `cmp.example.com` as a Railway custom domain behind Cloudflare proxy
+- Add Cloudflare cache rules for runtime script, active config, pinned config, and GPC declaration
+- Bypass Cloudflare cache for Admin, consent writes, disclosure history, reports, exports, and storage APIs
 - Configure production environment variables and secret handling
 - Establish automated backup export and restore testing
 - Add uptime monitoring, log retention, and basic alerting

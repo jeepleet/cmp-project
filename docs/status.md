@@ -86,9 +86,9 @@ Phase 6 implemented:
 
 Phase 7 planned scope:
 
-- Production hosting decision, region selection, Node runtime strategy, and deployment packaging
-- Persistent storage, backup automation, and restore testing
-- HTTPS domain, reverse proxy, security headers, and production secrets
+- Railway hosting, `/app/data` volume persistence, Node runtime strategy, and deployment packaging
+- Cloudflare DNS, proxied custom domain, runtime/config cache rules, cache bypasses, and production security controls
+- Backup automation, off-platform backup handling, and restore testing
 - Monitoring, logs, alerts, deployment runbook, and rollback runbook
 - Live website install, GTM bridge verification, public config caching verification, disclosure page verification, GPC verification, and consent record write verification
 
