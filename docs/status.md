@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 ## Current Stage
 
@@ -16,7 +16,7 @@ The project has completed the Phase 5 operational scale slice: multi-site suppor
 - **Reporting Dashboard:** Site-scoped accept, reject, partial, and ignore metrics with daily breakdowns.
 - **Consent Retention:** Configurable consent record retention with status and manual purge controls.
 - **Config Management:** Draft editor with automatic versioning, Visual Diff before publishing, active config URLs, and pinned immutable config URLs.
-- **Banner Editor:** Customizable copy, colors, center/default or bottom layout, logo upload, logo alt text, and custom CSS.
+- **Banner Editor:** Customizable copy, language presets for first-layer text, consent categories, and disclosure text, privacy policy URL, colors, corner style, center/default or bottom layout, logo upload, logo alt text, and custom CSS.
 - **Consent Logic:** Google Consent Mode v2 mapping with Regional Overrides (e.g. EEA) and optional Shopify Customer Privacy API sync.
 - **Manual Services:** Service-to-category assignment with automatic cookie cleanup patterns.
 - **Proof of Consent:** Server-side append-only records (JSONL) with persistent Consent IDs (CID).
@@ -83,6 +83,14 @@ Phase 6 implemented:
 - Admin Reporting panel has JSON and CSV export buttons for the selected site and period
 - Storage status API: `GET /api/storage/status`
 - Admin Storage panel shows data store, database size, consent record count, backup count, and technical details behind an expandable section
+
+Phase 7 planned scope:
+
+- Production hosting decision, region selection, Node runtime strategy, and deployment packaging
+- Persistent storage, backup automation, and restore testing
+- HTTPS domain, reverse proxy, security headers, and production secrets
+- Monitoring, logs, alerts, deployment runbook, and rollback runbook
+- Live website install, GTM bridge verification, public config caching verification, disclosure page verification, GPC verification, and consent record write verification
 
 Phase 6 planned scope:
 

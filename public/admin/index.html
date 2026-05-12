@@ -129,6 +129,20 @@
                 <textarea name="banner.body" rows="4" maxlength="500"></textarea>
               </label>
               <label>
+                Banner language
+                <select name="banner.language" id="banner-language">
+                  <option value="en">English</option>
+                  <option value="da">Danish</option>
+                  <option value="sv">Swedish</option>
+                  <option value="no">Norwegian</option>
+                  <option value="de">German</option>
+                </select>
+              </label>
+              <label>
+                Privacy policy URL
+                <input name="banner.privacyPolicyUrl" type="url" maxlength="500" placeholder="https://example.com/privacy">
+              </label>
+              <label>
                 Accept text
                 <input name="banner.acceptAllText" type="text" maxlength="60">
               </label>
@@ -152,6 +166,15 @@
                 <input name="banner.positionBottom" type="checkbox" id="banner-position-bottom">
                 Show banner at the bottom
               </label>
+              <label>
+                Corner style
+                <select name="banner.cornerStyle">
+                  <option value="round">Round</option>
+                  <option value="semi">Semi-round</option>
+                  <option value="square">Square</option>
+                </select>
+              </label>
+              <div></div>
               <label class="span-2">
                 Logo
                 <input id="banner-logo-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">

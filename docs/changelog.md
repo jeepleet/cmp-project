@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-12
+
+### Added
+
+- Banner language selector in Admin with preset translations for English, Danish, Swedish, Norwegian, and German.
+- Privacy policy URL field in the Banner section.
+- Runtime rendering for the configured privacy policy link.
+- Localized banner privacy policy link text and GPC notice text from the selected language preset.
+- Localized consent category labels and descriptions from the selected banner language preset.
+- Localized "View my consent data" banner link and disclosure page text.
+- Banner corner style control with round, semi-round, and square options.
+- Roadmap Phase 7 for real website go-live, covering hosting, deployment, persistence, monitoring, and live verification.
+
 ## 2026-05-11
 
 ### Added

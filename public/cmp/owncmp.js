@@ -73,6 +73,9 @@
       : initialSelection(config, gpcActive);
     var banner = config.banner || {};
     var theme = banner.theme || {};
+    var privacyPolicyUrl = safeHttpUrl(banner.privacyPolicyUrl);
+    var disclosureUrl = "/disclosure.html?siteId=" + encodeURIComponent(config.siteId || siteId);
+    var radius = bannerRadius(banner.cornerStyle);
     var root = document.createElement("div");
     root.id = "owncmp-root";
     root.className = banner.position === "center" ? "owncmp-position-center" : "owncmp-position-bottom";
@@ -83,7 +86,8 @@
       '<div class="owncmp-copy">',
       '<h2 id="owncmp-title">' + escapeHtml(banner.title || "Privacy choices") + "</h2>",
       '<p id="owncmp-body">' + escapeHtml(banner.body || "Choose which cookies and technologies you allow.") + "</p>",
-      gpcActive && config.gpc.showNotice ? '<p class="owncmp-note">Global Privacy Control was detected. Sale and sharing categories are off by default.</p>' : "",
+      privacyPolicyUrl ? '<p class="owncmp-linkline"><a href="' + escapeHtml(privacyPolicyUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(banner.privacyPolicyText || "Privacy policy") + "</a></p>" : "",
+      gpcActive && config.gpc.showNotice ? '<p class="owncmp-note">' + escapeHtml(banner.gpcNoticeText || "Global Privacy Control was detected. Sale and sharing categories are off by default.") + "</p>" : "",
       "</div>",
       '<div class="owncmp-actions">',
       '<button type="button" class="owncmp-btn owncmp-neutral" data-owncmp-reject>' + escapeHtml(banner.rejectAllText || "Reject all") + "</button>",
@@ -93,7 +97,7 @@
       '<div class="owncmp-preferences" hidden>',
       '<div class="owncmp-category-list">' + categoryControls(config, selection) + "</div>",
       '<div class="owncmp-actions owncmp-actions-end">',
-      '<a href="/disclosure.html" target="_blank" style="font-size: 12px; color: var(--owncmp-neutral); margin-right: auto; text-decoration: underline;">View my consent data</a>',
+      '<a href="' + escapeHtml(disclosureUrl) + '" target="_blank" style="font-size: 12px; color: var(--owncmp-neutral); margin-right: auto; text-decoration: underline;">' + escapeHtml(banner.disclosureLinkText || "View my consent data") + "</a>",
       '<button type="button" class="owncmp-btn owncmp-primary" data-owncmp-save>' + escapeHtml(banner.saveText || "Save choices") + "</button>",
       "</div>",
       "</div>",
@@ -105,6 +109,8 @@
     root.style.setProperty("--owncmp-border", theme.border || "#d9dee7");
     root.style.setProperty("--owncmp-primary", theme.primary || "#0f766e");
     root.style.setProperty("--owncmp-neutral", theme.neutral || "#374151");
+    root.style.setProperty("--owncmp-radius", radius.panel);
+    root.style.setProperty("--owncmp-control-radius", radius.control);
 
     injectStyles(banner.customCss);
     appendToBody(root);
@@ -457,13 +463,14 @@
     style.textContent = [
       "#owncmp-root{position:fixed;inset:0;z-index:2147483647;color:var(--owncmp-text);font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.4}",
       ".owncmp-backdrop{position:absolute;inset:0;background:rgba(29,31,36,.18)}",
-      ".owncmp-panel{position:absolute;left:16px;right:16px;bottom:16px;max-width:960px;margin:auto;background:var(--owncmp-bg);border:1px solid var(--owncmp-border);border-radius:8px;box-shadow:0 18px 50px rgba(29,31,36,.18);padding:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px}",
+      ".owncmp-panel{position:absolute;left:16px;right:16px;bottom:16px;max-width:960px;margin:auto;background:var(--owncmp-bg);border:1px solid var(--owncmp-border);border-radius:var(--owncmp-radius);box-shadow:0 18px 50px rgba(29,31,36,.18);padding:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px}",
       ".owncmp-position-center .owncmp-panel{top:50%;bottom:auto;transform:translateY(-50%);max-width:720px;grid-template-columns:1fr}",
       ".owncmp-logo{grid-column:1/-1;margin-bottom:-4px}.owncmp-logo img{display:block;max-width:180px;max-height:64px;object-fit:contain}",
       ".owncmp-copy h2{margin:0 0 8px;font-size:20px;letter-spacing:0}.owncmp-copy p{margin:0;color:var(--owncmp-text)}.owncmp-note{margin-top:10px!important;font-size:13px}",
+      ".owncmp-linkline{margin-top:10px!important;font-size:13px}.owncmp-linkline a{color:var(--owncmp-neutral);text-decoration:underline}",
       ".owncmp-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.owncmp-actions-end{margin-top:14px}",
-      ".owncmp-btn{min-height:40px;border-radius:6px;border:1px solid var(--owncmp-border);padding:0 14px;font:inherit;font-weight:700;cursor:pointer}.owncmp-primary{color:#fff;background:var(--owncmp-primary);border-color:var(--owncmp-primary)}.owncmp-neutral{color:#fff;background:var(--owncmp-neutral);border-color:var(--owncmp-neutral)}.owncmp-plain{background:#fff;color:var(--owncmp-text)}",
-      ".owncmp-preferences{grid-column:1/-1;border-top:1px solid var(--owncmp-border);padding-top:14px}.owncmp-category-list{display:grid;gap:10px}.owncmp-category{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border:1px solid var(--owncmp-border);border-radius:8px}.owncmp-category small{display:block;margin-top:3px;color:#667085}.owncmp-category input{width:20px;height:20px}",
+      ".owncmp-btn{min-height:40px;border-radius:var(--owncmp-control-radius);border:1px solid var(--owncmp-border);padding:0 14px;font:inherit;font-weight:700;cursor:pointer}.owncmp-primary{color:#fff;background:var(--owncmp-primary);border-color:var(--owncmp-primary)}.owncmp-neutral{color:#fff;background:var(--owncmp-neutral);border-color:var(--owncmp-neutral)}.owncmp-plain{background:#fff;color:var(--owncmp-text)}",
+      ".owncmp-preferences{grid-column:1/-1;border-top:1px solid var(--owncmp-border);padding-top:14px}.owncmp-category-list{display:grid;gap:10px}.owncmp-category{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border:1px solid var(--owncmp-border);border-radius:var(--owncmp-radius)}.owncmp-category small{display:block;margin-top:3px;color:#667085}.owncmp-category input{width:20px;height:20px}",
       "@media(max-width:720px){.owncmp-panel{grid-template-columns:1fr;left:8px;right:8px;bottom:8px}.owncmp-position-center .owncmp-panel{top:50%;bottom:auto}.owncmp-actions{justify-content:stretch}.owncmp-btn{flex:1 1 140px}}"
     ].join("") + (customCss ? "\n" + String(customCss) : "");
     document.head.appendChild(style);
@@ -580,6 +587,23 @@
   function cssEscape(value) {
     if (window.CSS && CSS.escape) return CSS.escape(value);
     return String(value).replace(/"/g, '\\"');
+  }
+
+  function safeHttpUrl(value) {
+    var text = String(value || "").trim();
+    if (!text) return "";
+    try {
+      var url = new URL(text, window.location.href);
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function bannerRadius(cornerStyle) {
+    if (cornerStyle === "round") return { panel: "16px", control: "999px" };
+    if (cornerStyle === "square") return { panel: "0", control: "0" };
+    return { panel: "8px", control: "6px" };
   }
 
   function escapeHtml(value) {

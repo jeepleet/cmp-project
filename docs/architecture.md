@@ -58,7 +58,7 @@ The runtime contract does not depend on the storage driver. A later Postgres dri
 
 ### Admin UI
 
-The admin UI in `public/admin` is a vanilla web app. It has a site selector, a new-site flow, and guarded switching when draft changes are unsaved. For the selected site, it edits banner copy, colors, placement, logo, custom CSS, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
+The admin UI in `public/admin` is a vanilla web app. It has a site selector, a new-site flow, and guarded switching when draft changes are unsaved. For the selected site, it edits banner copy, language presets for first-layer text, consent categories, and disclosure text, privacy policy URL, colors, corner style, placement, logo, custom CSS, category defaults, services, regional overrides, and publishes config. It also supports JSON import/export, visual publish diffs, publish history, and rollback.
 
 ### Public config endpoint
 
@@ -149,7 +149,9 @@ The Admin Storage panel uses this endpoint to show user-facing data-store health
 - Reads stored consent if available.
 - Shows a banner if there is no valid decision.
 - Supports centered default or bottom banner placement.
+- Supports round, semi-round, or square banner corner styling.
 - Supports an optional banner logo and site-defined custom banner CSS from config.
+- Supports configured banner language copy, localized category labels, localized disclosure text, and an optional privacy policy link.
 - Updates Google consent state after a user decision.
 - Optionally syncs explicit user choices to Shopify Customer Privacy API when enabled.
 - Pushes one stable dataLayer event shape.

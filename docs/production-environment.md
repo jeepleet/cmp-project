@@ -10,11 +10,13 @@ Own CMP should be deployed behind HTTPS. The Node server can run behind a revers
 
 ## Runtime Requirements
 
-- Node.js 25 or newer
+- Node.js 25 or newer for the current native SQLite implementation
 - Writable `data/` directory
 - Persistent disk for `data/owncmp.sqlite`
 - HTTPS at the public edge
 - Reverse proxy should forward `X-Forwarded-Proto: https`
+
+For a real go-live plan, see `docs/phase-7-go-live.md`.
 
 ## Required Environment Variables
 

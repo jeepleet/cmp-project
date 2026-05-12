@@ -61,6 +61,22 @@
 - [x] Storage/status screen in Admin
 - Final GTM `.tpl` import and template verification
 
+## Phase 7: Real Website Go-Live
+
+- Select production hosting model and region
+- Resolve production Node runtime strategy: verify Node 24 LTS compatibility or pin a supported deployment image deliberately
+- Containerize or otherwise package the Node runtime for repeatable deploys
+- Provision persistent storage for `data/owncmp.sqlite`, backups, and published configs
+- Configure HTTPS, domain, reverse proxy, and security headers
+- Configure production environment variables and secret handling
+- Establish automated backup export and restore testing
+- Add uptime monitoring, log retention, and basic alerting
+- Create deployment and rollback runbook
+- Publish first production config and install the runtime snippet on a real website
+- Verify GTM Consent Mode bridge on the live domain
+- Verify public config caching, disclosure page, GPC resource, and consent record writes
+- Document operational ownership and maintenance schedule
+
 ## Later Track: Product Polish
 
 - Admin UI polish (dark mode, better error states)

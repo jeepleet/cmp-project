@@ -15,6 +15,244 @@ const state = {
 const qs = (selector, root = document) => root.querySelector(selector);
 const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
+const BANNER_LANGUAGE_PRESETS = {
+  en: {
+    title: "Privacy choices",
+    body: "We use cookies and similar technologies for analytics, marketing, and personalization. Choose what you allow.",
+    acceptAllText: "Accept all",
+    rejectAllText: "Reject all",
+    preferencesText: "Preferences",
+    saveText: "Save choices",
+    closeText: "Close",
+    privacyPolicyText: "Privacy policy",
+    disclosureLinkText: "View my consent data",
+    gpcNoticeText: "Global Privacy Control was detected. Sale and sharing categories are off by default.",
+    categories: {
+      necessary: {
+        label: "Necessary",
+        description: "Required for security, consent storage, and basic site functionality."
+      },
+      analytics: {
+        label: "Analytics",
+        description: "Helps measure traffic and improve the site."
+      },
+      marketing: {
+        label: "Marketing",
+        description: "Supports advertising measurement, remarketing, and campaign attribution."
+      },
+      personalization: {
+        label: "Personalization",
+        description: "Stores choices and content preferences beyond strictly necessary settings."
+      }
+    },
+    disclosurePage: {
+      title: "My Consent Data",
+      intro: "Under GDPR transparency requirements, you have the right to know what consent data we store. Below is your unique identifier and your historical decision trail on this site.",
+      cidLabel: "Your Consent ID (CID)",
+      loadingIdentifier: "Loading identifier...",
+      noIdentifier: "No identifier found in your browser.",
+      historyTitle: "Historical Trail",
+      loadingHistory: "Loading your history...",
+      noSessionRecords: "No historical records found for your current browser session.",
+      noServerRecords: "No historical records found on the server.",
+      tableDate: "Date",
+      tableVersion: "Version",
+      tableSource: "Source",
+      tableDecisions: "Decisions",
+      unknownVersion: "unknown",
+      errorPrefix: "Error loading history:"
+    }
+  },
+  da: {
+    title: "Privatlivsvalg",
+    body: "Vi bruger cookies og lignende teknologier til analyse, markedsføring og personalisering. Vælg, hvad du vil tillade.",
+    acceptAllText: "Acceptér alle",
+    rejectAllText: "Afvis alle",
+    preferencesText: "Indstillinger",
+    saveText: "Gem valg",
+    closeText: "Luk",
+    privacyPolicyText: "Privatlivspolitik",
+    disclosureLinkText: "Se mine samtykkedata",
+    gpcNoticeText: "Global Privacy Control blev registreret. Kategorier for salg og deling er som standard slået fra.",
+    categories: {
+      necessary: {
+        label: "Nødvendige",
+        description: "Påkrævet for sikkerhed, lagring af samtykke og grundlæggende funktionalitet på websitet."
+      },
+      analytics: {
+        label: "Statistik",
+        description: "Hjælper med at måle trafik og forbedre websitet."
+      },
+      marketing: {
+        label: "Markedsføring",
+        description: "Understøtter annoncemåling, remarketing og kampagneattribuering."
+      },
+      personalization: {
+        label: "Personalisering",
+        description: "Gemmer valg og indholdspræferencer ud over strengt nødvendige indstillinger."
+      }
+    },
+    disclosurePage: {
+      title: "Mine samtykkedata",
+      intro: "I henhold til GDPR's gennemsigtighedskrav har du ret til at vide, hvilke samtykkedata vi opbevarer. Nedenfor finder du din unikke identifikator og din historiske beslutningslog for dette website.",
+      cidLabel: "Dit samtykke-ID (CID)",
+      loadingIdentifier: "Indlæser identifikator...",
+      noIdentifier: "Ingen identifikator blev fundet i din browser.",
+      historyTitle: "Historik",
+      loadingHistory: "Indlæser din historik...",
+      noSessionRecords: "Der blev ikke fundet historiske registreringer for din aktuelle browsersession.",
+      noServerRecords: "Der blev ikke fundet historiske registreringer på serveren.",
+      tableDate: "Dato",
+      tableVersion: "Version",
+      tableSource: "Kilde",
+      tableDecisions: "Valg",
+      unknownVersion: "ukendt",
+      errorPrefix: "Fejl ved indlæsning af historik:"
+    }
+  },
+  sv: {
+    title: "Integritetsval",
+    body: "Vi använder cookies och liknande tekniker för analys, marknadsföring och personalisering. Välj vad du vill tillåta.",
+    acceptAllText: "Acceptera alla",
+    rejectAllText: "Avvisa alla",
+    preferencesText: "Inställningar",
+    saveText: "Spara val",
+    closeText: "Stäng",
+    privacyPolicyText: "Integritetspolicy",
+    disclosureLinkText: "Visa mina samtyckesdata",
+    gpcNoticeText: "Global Privacy Control upptäcktes. Kategorier för försäljning och delning är avstängda som standard.",
+    categories: {
+      necessary: {
+        label: "Nödvändiga",
+        description: "Krävs för säkerhet, lagring av samtycke och grundläggande webbplatsfunktioner."
+      },
+      analytics: {
+        label: "Statistik",
+        description: "Hjälper till att mäta trafik och förbättra webbplatsen."
+      },
+      marketing: {
+        label: "Marknadsföring",
+        description: "Stöder annonsmätning, remarketing och kampanjattribuering."
+      },
+      personalization: {
+        label: "Personanpassning",
+        description: "Sparar val och innehållsinställningar utöver strikt nödvändiga inställningar."
+      }
+    },
+    disclosurePage: {
+      title: "Mina samtyckesdata",
+      intro: "Enligt GDPR:s krav på transparens har du rätt att veta vilka samtyckesdata vi lagrar. Nedan finns din unika identifierare och din historiska beslutslogg för denna webbplats.",
+      cidLabel: "Ditt samtyckes-ID (CID)",
+      loadingIdentifier: "Läser in identifierare...",
+      noIdentifier: "Ingen identifierare hittades i din webbläsare.",
+      historyTitle: "Historik",
+      loadingHistory: "Läser in din historik...",
+      noSessionRecords: "Inga historiska poster hittades för din aktuella webbläsarsession.",
+      noServerRecords: "Inga historiska poster hittades på servern.",
+      tableDate: "Datum",
+      tableVersion: "Version",
+      tableSource: "Källa",
+      tableDecisions: "Val",
+      unknownVersion: "okänd",
+      errorPrefix: "Fel vid inläsning av historik:"
+    }
+  },
+  no: {
+    title: "Personvernvalg",
+    body: "Vi bruker informasjonskapsler og lignende teknologier til analyse, markedsføring og personalisering. Velg hva du vil tillate.",
+    acceptAllText: "Godta alle",
+    rejectAllText: "Avvis alle",
+    preferencesText: "Innstillinger",
+    saveText: "Lagre valg",
+    closeText: "Lukk",
+    privacyPolicyText: "Personvernerklæring",
+    disclosureLinkText: "Se mine samtykkedata",
+    gpcNoticeText: "Global Privacy Control ble oppdaget. Kategorier for salg og deling er slått av som standard.",
+    categories: {
+      necessary: {
+        label: "Nødvendige",
+        description: "Kreves for sikkerhet, lagring av samtykke og grunnleggende funksjonalitet på nettstedet."
+      },
+      analytics: {
+        label: "Analyse",
+        description: "Hjelper med å måle trafikk og forbedre nettstedet."
+      },
+      marketing: {
+        label: "Markedsføring",
+        description: "Støtter annonsemåling, remarketing og kampanjeattribusjon."
+      },
+      personalization: {
+        label: "Personalisering",
+        description: "Lagrer valg og innholdspreferanser utover strengt nødvendige innstillinger."
+      }
+    },
+    disclosurePage: {
+      title: "Mine samtykkedata",
+      intro: "I henhold til GDPRs krav til åpenhet har du rett til å vite hvilke samtykkedata vi lagrer. Nedenfor finner du din unike identifikator og din historiske beslutningslogg for dette nettstedet.",
+      cidLabel: "Din samtykke-ID (CID)",
+      loadingIdentifier: "Laster inn identifikator...",
+      noIdentifier: "Ingen identifikator ble funnet i nettleseren din.",
+      historyTitle: "Historikk",
+      loadingHistory: "Laster inn historikken din...",
+      noSessionRecords: "Ingen historiske oppføringer ble funnet for den nåværende nettleserøkten.",
+      noServerRecords: "Ingen historiske oppføringer ble funnet på serveren.",
+      tableDate: "Dato",
+      tableVersion: "Versjon",
+      tableSource: "Kilde",
+      tableDecisions: "Valg",
+      unknownVersion: "ukjent",
+      errorPrefix: "Feil ved lasting av historikk:"
+    }
+  },
+  de: {
+    title: "Datenschutzeinstellungen",
+    body: "Wir verwenden Cookies und ähnliche Technologien für Analyse, Marketing und Personalisierung. Wählen Sie aus, was Sie zulassen möchten.",
+    acceptAllText: "Alle akzeptieren",
+    rejectAllText: "Alle ablehnen",
+    preferencesText: "Einstellungen",
+    saveText: "Auswahl speichern",
+    closeText: "Schließen",
+    privacyPolicyText: "Datenschutzerklärung",
+    disclosureLinkText: "Meine Einwilligungsdaten anzeigen",
+    gpcNoticeText: "Global Privacy Control wurde erkannt. Kategorien für Verkauf und Weitergabe sind standardmäßig deaktiviert.",
+    categories: {
+      necessary: {
+        label: "Notwendig",
+        description: "Erforderlich für Sicherheit, Speicherung der Einwilligung und grundlegende Funktionen der Website."
+      },
+      analytics: {
+        label: "Analyse",
+        description: "Hilft dabei, den Traffic zu messen und die Website zu verbessern."
+      },
+      marketing: {
+        label: "Marketing",
+        description: "Unterstützt Werbemessung, Remarketing und Kampagnenzuordnung."
+      },
+      personalization: {
+        label: "Personalisierung",
+        description: "Speichert Auswahl- und Inhaltseinstellungen über zwingend notwendige Einstellungen hinaus."
+      }
+    },
+    disclosurePage: {
+      title: "Meine Einwilligungsdaten",
+      intro: "Gemäß den Transparenzanforderungen der DSGVO haben Sie das Recht zu erfahren, welche Einwilligungsdaten wir speichern. Unten finden Sie Ihre eindeutige Kennung und Ihren historischen Entscheidungsverlauf auf dieser Website.",
+      cidLabel: "Ihre Einwilligungs-ID (CID)",
+      loadingIdentifier: "Kennung wird geladen...",
+      noIdentifier: "In Ihrem Browser wurde keine Kennung gefunden.",
+      historyTitle: "Historischer Verlauf",
+      loadingHistory: "Ihr Verlauf wird geladen...",
+      noSessionRecords: "Für Ihre aktuelle Browsersitzung wurden keine historischen Einträge gefunden.",
+      noServerRecords: "Auf dem Server wurden keine historischen Einträge gefunden.",
+      tableDate: "Datum",
+      tableVersion: "Version",
+      tableSource: "Quelle",
+      tableDecisions: "Entscheidungen",
+      unknownVersion: "unbekannt",
+      errorPrefix: "Fehler beim Laden des Verlaufs:"
+    }
+  }
+};
+
 const loginView = qs("#login-view");
 const appView = qs("#app-view");
 const saveState = qs("#save-state");
@@ -175,8 +413,22 @@ function bindActions() {
       renderSnippets();
       return;
     }
+    if (target.name === "banner.language") {
+      return;
+    }
     setPath(state.config, target.name, target.value);
     markDirty();
+    renderOverview();
+    renderSnippets();
+  });
+
+  safeListen("#banner-language", "change", (event) => {
+    if (!state.config) return;
+    applyBannerLanguage(event.target.value);
+    markDirty();
+    renderBannerForm();
+    renderCategories();
+    renderServices();
     renderOverview();
     renderSnippets();
   });
@@ -400,6 +652,19 @@ function renderBannerForm() {
     input.value = getPath(state.config, input.name) ?? "";
   });
   renderLogoPreview();
+}
+
+function applyBannerLanguage(language) {
+  const preset = BANNER_LANGUAGE_PRESETS[language] || BANNER_LANGUAGE_PRESETS.en;
+  state.config.banner = state.config.banner || {};
+  const { categories, ...bannerCopy } = preset;
+  Object.assign(state.config.banner, bannerCopy, { language });
+  if (categories && Array.isArray(state.config.categories)) {
+    state.config.categories = state.config.categories.map((category) => {
+      const translation = categories[category.id];
+      return translation ? { ...category, ...translation } : category;
+    });
+  }
 }
 
 function renderLogoPreview() {

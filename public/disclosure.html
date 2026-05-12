@@ -63,16 +63,16 @@
 </head>
 <body>
     <div class="card">
-        <h1>My Consent Data</h1>
-        <p class="intro">
+        <h1 id="page-title">My Consent Data</h1>
+        <p id="page-intro" class="intro">
             Under GDPR transparency requirements, you have the right to know what consent data we store. 
             Below is your unique identifier and your historical decision trail on this site.
         </p>
 
-        <div class="cid-label">Your Consent ID (CID)</div>
+        <div id="cid-label" class="cid-label">Your Consent ID (CID)</div>
         <div id="cid-display" class="cid-box">Loading identifier...</div>
 
-        <h2>Historical Trail</h2>
+        <h2 id="history-title">Historical Trail</h2>
         <div id="history-container">
             <div class="loading">Loading your history...</div>
         </div>
@@ -84,13 +84,31 @@
     <script>
         (function() {
             const BASE_COOKIE_NAME = 'owncmp_consent';
+            const FALLBACK_TEXTS = {
+                title: 'My Consent Data',
+                intro: 'Under GDPR transparency requirements, you have the right to know what consent data we store. Below is your unique identifier and your historical decision trail on this site.',
+                cidLabel: 'Your Consent ID (CID)',
+                loadingIdentifier: 'Loading identifier...',
+                noIdentifier: 'No identifier found in your browser.',
+                historyTitle: 'Historical Trail',
+                loadingHistory: 'Loading your history...',
+                noSessionRecords: 'No historical records found for your current browser session.',
+                noServerRecords: 'No historical records found on the server.',
+                tableDate: 'Date',
+                tableVersion: 'Version',
+                tableSource: 'Source',
+                tableDecisions: 'Decisions',
+                unknownVersion: 'unknown',
+                errorPrefix: 'Error loading history:'
+            };
             
-            function readSiteCookie() {
+            function readSiteCookie(cookieName, siteId) {
                 const cookies = document.cookie ? document.cookie.split(';') : [];
-                // Look for any cookie starting with our base name
+                const exactName = cookieName && siteId ? `${cookieName}_${siteId}` : '';
                 for (let i = 0; i < cookies.length; i++) {
                     const part = cookies[i].trim();
-                    if (part.indexOf(BASE_COOKIE_NAME) === 0) {
+                    const name = part.split('=')[0];
+                    if ((exactName && name === exactName) || (!exactName && name.indexOf(BASE_COOKIE_NAME) === 0)) {
                         try {
                             const value = decodeURIComponent(part.split('=')[1]);
                             return JSON.parse(value);
@@ -102,38 +120,89 @@
                 return null;
             }
 
-            const stored = readSiteCookie();
-            const cidDisplay = document.getElementById('cid-display');
-            const historyContainer = document.getElementById('history-container');
-
-            if (!stored || !stored.cid) {
-                cidDisplay.textContent = 'No identifier found in your browser.';
-                historyContainer.innerHTML = '<div class="empty">No historical records found for your current browser session.</div>';
-                return;
+            async function loadConfig(siteId) {
+                try {
+                    const response = await fetch(`/api/public/config/${encodeURIComponent(siteId)}/production`);
+                    return response.ok ? response.json() : null;
+                } catch (_) {
+                    return null;
+                }
             }
 
-            cidDisplay.textContent = stored.cid;
+            function disclosureTexts(config) {
+                return Object.assign({}, FALLBACK_TEXTS, config?.banner?.disclosurePage || {});
+            }
 
-            fetch(`/api/public/disclosure/${stored.siteId}/${stored.cid}`)
-                .then(res => res.json())
-                .then(data => {
+            function applyTexts(texts, language) {
+                document.documentElement.lang = language || 'en';
+                document.title = `${texts.title} | Own CMP`;
+                document.getElementById('page-title').textContent = texts.title;
+                document.getElementById('page-intro').textContent = texts.intro;
+                document.getElementById('cid-label').textContent = texts.cidLabel;
+                document.getElementById('cid-display').textContent = texts.loadingIdentifier;
+                document.getElementById('history-title').textContent = texts.historyTitle;
+                document.getElementById('history-container').innerHTML = `<div class="loading">${escapeHtml(texts.loadingHistory)}</div>`;
+            }
+
+            function categoryLabels(config) {
+                return Object.fromEntries((config?.categories || []).map((category) => [category.id, category.label || category.id]));
+            }
+
+            function escapeHtml(value) {
+                return String(value == null ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            async function initDisclosure() {
+                const params = new URLSearchParams(window.location.search);
+                let siteId = params.get('siteId') || 'demo-site';
+                let config = await loadConfig(siteId);
+                let stored = readSiteCookie(config?.consentCookieName || BASE_COOKIE_NAME, siteId) || readSiteCookie();
+
+                if (!params.get('siteId') && stored?.siteId && stored.siteId !== siteId) {
+                    siteId = stored.siteId;
+                    config = await loadConfig(siteId);
+                    stored = readSiteCookie(config?.consentCookieName || BASE_COOKIE_NAME, siteId) || stored;
+                }
+
+                const texts = disclosureTexts(config);
+                const cidDisplay = document.getElementById('cid-display');
+                const historyContainer = document.getElementById('history-container');
+                applyTexts(texts, config?.banner?.language || 'en');
+
+                if (!stored || !stored.cid) {
+                    cidDisplay.textContent = texts.noIdentifier;
+                    historyContainer.innerHTML = `<div class="empty">${escapeHtml(texts.noSessionRecords)}</div>`;
+                    return;
+                }
+
+                cidDisplay.textContent = stored.cid;
+                const labels = categoryLabels(config);
+
+                fetch(`/api/public/disclosure/${encodeURIComponent(stored.siteId)}/${encodeURIComponent(stored.cid)}`)
+                    .then(res => res.json())
+                    .then(data => {
                     if (!data || data.length === 0) {
-                        historyContainer.innerHTML = '<div class="empty">No historical records found on the server.</div>';
+                        historyContainer.innerHTML = `<div class="empty">${escapeHtml(texts.noServerRecords)}</div>`;
                         return;
                     }
 
-                    let html = '<table><thead><tr><th>Date</th><th>Version</th><th>Source</th><th>Decisions</th></tr></thead><tbody>';
+                    let html = `<table><thead><tr><th>${escapeHtml(texts.tableDate)}</th><th>${escapeHtml(texts.tableVersion)}</th><th>${escapeHtml(texts.tableSource)}</th><th>${escapeHtml(texts.tableDecisions)}</th></tr></thead><tbody>`;
                     data.forEach(entry => {
                         const date = new Date(entry.ts || entry.createdAt).toLocaleString();
                         const categories = Object.entries(entry.categories).map(([id, granted]) => {
-                            return `<span class="pill ${granted ? 'granted' : 'denied'}">${id}</span>`;
+                            return `<span class="pill ${granted ? 'granted' : 'denied'}">${escapeHtml(labels[id] || id)}</span>`;
                         }).join(' ');
 
                         html += `
                             <tr>
-                                <td style="white-space: nowrap">${date}</td>
-                                <td>${entry.configVersion || 'unknown'}</td>
-                                <td class="source">${entry.source}</td>
+                                <td style="white-space: nowrap">${escapeHtml(date)}</td>
+                                <td>${escapeHtml(entry.configVersion || texts.unknownVersion)}</td>
+                                <td class="source">${escapeHtml(entry.source || '')}</td>
                                 <td>${categories}</td>
                             </tr>
                         `;
@@ -142,8 +211,11 @@
                     historyContainer.innerHTML = html;
                 })
                 .catch(err => {
-                    historyContainer.innerHTML = `<div class="empty" style="color: #991b1b">Error loading history: ${err.message}</div>`;
+                    historyContainer.innerHTML = `<div class="empty" style="color: #991b1b">${escapeHtml(texts.errorPrefix)} ${escapeHtml(err.message)}</div>`;
                 });
+            }
+
+            initDisclosure();
         })();
     </script>
 </body>

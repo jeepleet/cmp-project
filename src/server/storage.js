@@ -41,7 +41,29 @@ export const DEFAULT_CONFIG = {
     saveText: "Save choices",
     closeText: "Close",
     position: "center",
+    cornerStyle: "semi",
     language: "en",
+    privacyPolicyUrl: "",
+    privacyPolicyText: "Privacy policy",
+    disclosureLinkText: "View my consent data",
+    gpcNoticeText: "Global Privacy Control was detected. Sale and sharing categories are off by default.",
+    disclosurePage: {
+      title: "My Consent Data",
+      intro: "Under GDPR transparency requirements, you have the right to know what consent data we store. Below is your unique identifier and your historical decision trail on this site.",
+      cidLabel: "Your Consent ID (CID)",
+      loadingIdentifier: "Loading identifier...",
+      noIdentifier: "No identifier found in your browser.",
+      historyTitle: "Historical Trail",
+      loadingHistory: "Loading your history...",
+      noSessionRecords: "No historical records found for your current browser session.",
+      noServerRecords: "No historical records found on the server.",
+      tableDate: "Date",
+      tableVersion: "Version",
+      tableSource: "Source",
+      tableDecisions: "Decisions",
+      unknownVersion: "unknown",
+      errorPrefix: "Error loading history:"
+    },
     logoDataUrl: "",
     logoAlt: "",
     customCss: "",
@@ -281,6 +303,30 @@ function validBannerLogoDataUrl(value) {
   return /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,[a-zA-Z0-9+/=]+$/.test(text);
 }
 
+function safeBannerLanguage(value) {
+  const language = String(value || "en").toLowerCase();
+  return ["en", "da", "sv", "no", "de"].includes(language) ? language : "en";
+}
+
+function safePrivacyPolicyUrl(value) {
+  const text = String(value || "").trim().slice(0, 500);
+  if (!text) return "";
+  try {
+    const url = new URL(text);
+    return ["http:", "https:"].includes(url.protocol) ? text : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function normalizeDisclosurePage(value = {}) {
+  const defaults = DEFAULT_CONFIG.banner.disclosurePage;
+  return Object.fromEntries(Object.entries(defaults).map(([key, defaultValue]) => [
+    key,
+    String(value[key] || defaultValue).slice(0, 500)
+  ]));
+}
+
 function closeDb() {
   if (!sqliteDb) return;
   sqliteDb.close();
@@ -470,6 +516,13 @@ function normalizeConfig(input, options = {}) {
     ...structuredClone(DEFAULT_CONFIG.banner),
     ...config.banner,
     position: ["bottom", "center"].includes(config.banner.position) ? config.banner.position : "center",
+    cornerStyle: ["round", "semi", "square"].includes(config.banner.cornerStyle) ? config.banner.cornerStyle : "semi",
+    language: safeBannerLanguage(config.banner.language),
+    privacyPolicyUrl: safePrivacyPolicyUrl(config.banner.privacyPolicyUrl),
+    privacyPolicyText: String(config.banner.privacyPolicyText || DEFAULT_CONFIG.banner.privacyPolicyText).slice(0, 80),
+    disclosureLinkText: String(config.banner.disclosureLinkText || DEFAULT_CONFIG.banner.disclosureLinkText).slice(0, 80),
+    gpcNoticeText: String(config.banner.gpcNoticeText || DEFAULT_CONFIG.banner.gpcNoticeText).slice(0, 240),
+    disclosurePage: normalizeDisclosurePage(config.banner.disclosurePage || {}),
     logoDataUrl: validBannerLogoDataUrl(config.banner.logoDataUrl) ? config.banner.logoDataUrl : "",
     logoAlt: String(config.banner.logoAlt || "").slice(0, 120),
     customCss: String(config.banner.customCss || "").slice(0, 12000),

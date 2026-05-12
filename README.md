@@ -71,7 +71,7 @@ This first version is dependency-free on purpose:
 - Multi-site admin selection and site creation
 - Site-scoped draft configs
 - Consent Reporting Dashboard with accept, reject, partial, ignore, and custom date-range metrics
-- Banner editor with center/default or bottom placement, logo upload, and custom CSS
+- Banner editor with language presets for banner, categories, and disclosure text, privacy policy URL, corner style, center/default or bottom placement, logo upload, and custom CSS
 - Import/export JSON
 - Region-specific Consent Mode overrides
 - Optional Shopify Customer Privacy API sync
@@ -98,6 +98,7 @@ The runtime does not delete cookies on first load. Cookie cleanup only runs afte
 - Architecture: `docs/architecture.md`
 - Durable storage: `docs/durable-storage.md`
 - Production environment: `docs/production-environment.md`
+- Phase 7 go-live: `docs/phase-7-go-live.md`
 - Roadmap: `docs/roadmap.md`
 - GTM bridge: `gtm/README.md`
 - GTM verification: `docs/gtm-verification.md`
