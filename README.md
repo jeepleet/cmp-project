@@ -71,7 +71,7 @@ This first version is dependency-free on purpose:
 - Multi-site admin selection and site creation
 - Site-scoped draft configs
 - Consent Reporting Dashboard with accept, reject, partial, ignore, and custom date-range metrics
-- Banner editor with language presets for banner, categories, and disclosure text, privacy policy URL, corner style, center/default or bottom placement, logo upload, and custom CSS
+- Banner editor with language presets for banner, categories, and disclosure text, privacy policy URL, corner style, center/default or bottom placement, persistent preferences icon side, logo upload, and custom CSS
 - Import/export JSON
 - Region-specific Consent Mode overrides
 - Optional Shopify Customer Privacy API sync
@@ -82,7 +82,7 @@ This first version is dependency-free on purpose:
 - Consent record export by site/date range as JSON or CSV
 - Admin storage/status screen
 - GPC support resource at `/.well-known/gpc.json`
-- GTM Consent Mode bridge source pack and generated `.tpl`
+- GTM Runtime Loader + Consent Mode Bridge source pack and generated `.tpl`
 - WordPress and Shopify integration guides
 - Performance Lab and real-time INP dashboard
 - (Next) Phase 6: production deployment readiness
@@ -91,6 +91,8 @@ This first version is dependency-free on purpose:
 
 The runtime does not delete cookies on first load. Cookie cleanup only runs after an explicit user choice denies a category.
 
+The runtime stores Own CMP consent in `CleanCmpConsent`. Existing legacy `owncmp_consent_:siteId` cookies are read and migrated when found.
+
 ## Project Docs
 
 - Current status: `docs/status.md`
@@ -98,6 +100,8 @@ The runtime does not delete cookies on first load. Cookie cleanup only runs afte
 - Architecture: `docs/architecture.md`
 - Durable storage: `docs/durable-storage.md`
 - Production environment: `docs/production-environment.md`
+- Working workflow: `docs/workflow.md`
+- Phase GTM Tag Fix: `docs/phase-gtm-tag-fix.md`
 - Phase 7 go-live: `docs/phase-7-go-live.md`
 - Roadmap: `docs/roadmap.md`
 - GTM bridge: `gtm/README.md`
@@ -133,11 +137,25 @@ Use a pinned production URL when a launch should stay on one immutable config ve
 </script>
 ```
 
-Active config responses are short-cacheable and revalidated with `ETag` / `Last-Modified`. Pinned config responses are immutable and cacheable for one year.
+Active config responses are short-cacheable and revalidated with `ETag` / `Last-Modified`. Pinned config responses are immutable and cacheable for one year. The stable runtime script URL revalidates on request so normal runtime fixes can roll out without customer-side GTM URL edits.
 
-## GTM Bridge Snippet
+## GTM Template Install
 
-When using the GTM Consent Mode bridge, let GTM manage Google consent updates:
+For GTM-only deployment, import `gtm/template.tpl` and fire it on **Consent Initialization - All Pages**. Configure:
+
+```text
+Load Own CMP runtime: true
+Runtime script URL: https://cmp.cleancmp.com/cmp/owncmp.js
+Site ID: demo-site
+Production config URL: https://cmp.cleancmp.com/api/public/config/demo-site/production
+dataLayer name: dataLayer
+```
+
+The GTM template injects the runtime using the stable script URL only. `siteId`, config URL, dataLayer name, and GTM Consent Mode flags are passed through `window.OwnCMPBootstrap`, not through query parameters on the injected script URL. If an old Runtime script URL field contains `?v=...`, the template strips it before injection.
+
+## GTM Bridge-Only Snippet
+
+When hardcoding the runtime while using the GTM Consent Mode bridge, let GTM manage Google consent updates:
 
 ```html
 <script
@@ -154,9 +172,11 @@ Template source and the generated importable template are in `gtm/`.
 
 The runtime pushes one canonical event shape when an existing or explicit user decision is available:
 
+When `data-google-consent="false"` is used with the GTM bridge, the GTM template registers through `OwnCMPAddConsentListener` and also has `OwnCMP.onReady` / `OwnCMP.onChange` plus `OwnCMPGtmBridge` fallbacks before this event is pushed. GTM deployment mode sets the same behavior through `window.OwnCMPBootstrap`, including the direct Consent Mode fallback used before the canonical dataLayer event.
+
 ```js
 dataLayer.push({
-  event: "owncmp.consent_ready",
+  event: "cmp_consent_ready",
   owncmp: {
     siteId: "demo-site",
     hasDecision: true,

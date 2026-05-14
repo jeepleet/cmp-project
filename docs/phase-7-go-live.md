@@ -7,7 +7,7 @@ Last updated: 2026-05-12
 Phase 7 turns Own CMP from a local project into a production service served from a fast public URL such as:
 
 ```text
-https://cmp.example.com
+https://cmp.cleancmp.com
 ```
 
 Railway will run the Node app and persist the SQLite-backed `data/` directory. Cloudflare will provide DNS, edge caching, TLS at the public edge, and performance/security controls.
@@ -16,7 +16,7 @@ Target architecture:
 
 ```text
 Visitor browser
-  -> https://cmp.example.com/cmp/owncmp.js
+  -> https://cmp.cleancmp.com/cmp/owncmp.js
   -> Cloudflare DNS + CDN
   -> Railway public edge
   -> Railway Node service
@@ -65,18 +65,31 @@ Do not treat Node 25 as the long-term production runtime.
 
 ## Phase 7 Checklist
 
-- Create Railway project and service.
-- Attach a Railway volume mounted at `/app/data`.
-- Set production environment variables.
-- Deploy the app and verify `/admin/`, `/cmp/owncmp.js`, and public config endpoints.
-- Add `cmp.example.com` as a Railway custom domain.
-- Create Cloudflare DNS record for `cmp.example.com`.
-- Enable Cloudflare proxy after Railway verifies the domain.
-- Add Cloudflare cache rules for runtime/config only.
-- Confirm admin, consent records, and disclosure history are never cached.
+- [x] Create Railway project and service from `jeepleet/own-cmp`.
+- [x] Set production environment variables, including `CMP_ADMIN_EMAIL` and `CMP_ADMIN_PASSWORD_HASH`.
+- [x] Attach a Railway volume mounted at `/app/data`.
+- [x] Deploy the app on Railway.
+- [x] Generate/open the Railway public domain and verify `/admin/` loads.
+- [x] Verify `/cmp/owncmp.js` on the Railway domain.
+- [x] Deploy and verify `/.well-known/gpc.json` on the Railway domain.
+- [x] Publish config and verify public config endpoint on the Railway domain.
+- [x] Buy production domain `cleancmp.com` in Cloudflare.
+- [x] Add `cmp.cleancmp.com` as a Railway custom domain on port `8080`.
+- [x] Create DNS-only Cloudflare CNAME record for `cmp.cleancmp.com`.
+- [x] Verify HTTPS on `https://cmp.cleancmp.com`.
+- [x] Enable Cloudflare proxy after Railway verifies the domain.
+- [x] Verify Admin, runtime script, GPC declaration, and public production config through the proxied Cloudflare hostname.
+- [x] Add Cloudflare bypass rule for Admin, consent writes, disclosure history, reports, exports, backups, storage, and authenticated APIs.
+- [x] Add Cloudflare cache rule for `/cmp/owncmp.js`.
+- [x] Add Cloudflare 60-second cache rule for active production config.
+- [x] Add Cloudflare one-year cache rule for public config paths as the pinned-config fallback.
+- [x] Add Cloudflare one-day cache rule for `/.well-known/gpc.json`.
+- [x] Verify active production config, pinned production config, and GPC declaration return JSON through Cloudflare.
+- [x] Confirm admin, consent records, and disclosure history are covered by the cache bypass rule.
 - Publish production config from Admin.
 - Install snippet on the real website.
 - Verify Google Consent Mode / GTM behavior.
+- [x] Verify GTM Runtime Loader + Consent Mode Bridge on live test domain `jeppeskaffe.dk`.
 - Configure backups, monitoring, and rollback procedures.
 
 ## Step 1: Prepare The Repository
@@ -89,6 +102,8 @@ src/server/index.js
 public/cmp/owncmp.js
 data/
 ```
+
+Current status: completed. The project is in GitHub at `jeepleet/own-cmp`.
 
 Railway should start the service with:
 
@@ -117,6 +132,8 @@ In Railway:
 
 If Railway's build logs show a Node version lower than the project requires, resolve the runtime before continuing. For a short-term Node 25 launch, use a pinned runtime strategy. For the long-term production track, move the app to Node 24 LTS compatibility.
 
+Current status: completed. Railway detected Node and deployed with Node `25.9.0` from `package.json > engines > node (>=25)`.
+
 ## Step 3: Add Persistent Storage
 
 Create a Railway volume and attach it to the Own CMP service.
@@ -130,6 +147,8 @@ Set the volume mount path to:
 This is mandatory. If the volume is mounted somewhere else, SQLite data, site configs, published configs, backups, and consent records may be lost on redeploy.
 
 After deployment, verify the Admin Storage panel shows SQLite and a database path under `data/`.
+
+Current status: completed at platform level. Railway mounted a volume for the service. Next manual check is Admin Storage after login.
 
 ## Step 4: Set Railway Variables
 
@@ -166,9 +185,13 @@ $hash
 
 Copy the printed hash into Railway as `CMP_ADMIN_PASSWORD_HASH`.
 
+Current status: completed. Railway logs no longer show the default-login warning.
+
 ## Step 5: First Railway Deploy Verification
 
 Deploy the service and open the Railway-generated domain first.
+
+Current status: Cloudflare proxy and cache rules configured. Railway deployment is successful, `/admin/` loads, `/cmp/owncmp.js` returns JavaScript, `/.well-known/gpc.json` returns JSON, and `/api/public/config/demo-site/production` plus a pinned production config URL both return JSON through `https://cmp.cleancmp.com`. Cloudflare now bypasses private/write endpoints, caches the runtime script for 1 day, caches active production config for 60 seconds, caches public config paths for 1 year as the pinned-config fallback, and caches the GPC declaration for 1 day.
 
 Verify:
 
@@ -308,23 +331,19 @@ Expression:
 Action:
 
 ```text
-Eligible for cache
-Edge TTL: 1 day
-Browser TTL: Respect origin or 5 minutes
+Eligible for cache with origin revalidation
+Edge TTL: Respect origin, or the shortest available TTL with revalidation
+Browser TTL: Respect origin
 ```
 
-After runtime script versioning exists, change this to:
+The current stable runtime URL should revalidate because GTM installs must not need cache-busting query strings or manual purges after normal runtime fixes. The origin header is:
 
 ```text
-Edge TTL: 1 year
-Browser TTL: 1 year
+Cache-Control: public, no-cache, must-revalidate
 ```
 
-Until then, purge this URL after deploying runtime changes:
+After a separate versioned runtime asset path exists, cache the versioned assets long-term and keep the install-facing loader/current-runtime URL revalidated.
 
-```text
-https://cmp.example.com/cmp/owncmp.js
-```
 
 ### Rule 3: Cache Active Production Config Briefly
 
@@ -352,8 +371,7 @@ Expression:
 
 ```text
 (http.host eq "cmp.example.com" and
- starts_with(http.request.uri.path, "/api/public/config/") and
- contains(http.request.uri.path, "/production/"))
+ starts_with(http.request.uri.path, "/api/public/config/"))
 ```
 
 Action:
@@ -365,6 +383,8 @@ Browser TTL: Respect origin or 1 year
 ```
 
 Reason: pinned version URLs are immutable.
+
+This project used the broader `starts_with` fallback because regex matching was not available in the current Cloudflare Cache Rules plan. Keep the active production config 60-second rule above this rule so `/api/public/config/:siteId/production` is handled before the broader one-year public config rule.
 
 ### Rule 5: Cache GPC Declaration
 
@@ -417,7 +437,7 @@ For normal rollout:
 </script>
 ```
 
-For GTM bridge mode:
+For direct script plus GTM bridge mode:
 
 ```html
 <script
@@ -428,7 +448,20 @@ For GTM bridge mode:
 </script>
 ```
 
+For GTM-only deployment, import `gtm/template.tpl` and configure:
+
+```text
+Load Own CMP runtime: true
+Runtime script URL: https://cmp.cleancmp.com/cmp/owncmp.js
+Site ID: demo-site
+Production config URL: https://cmp.cleancmp.com/api/public/config/demo-site/production
+dataLayer name: dataLayer
+Trigger: Consent Initialization - All Pages
+```
+
 Use pinned config URLs when a launch needs strict change control.
+
+Do not use temporary query strings such as `?v=...` on the Runtime script URL. The GTM template injects the stable URL only and passes `siteId`, config URL, dataLayer name, and Consent Mode flags through `window.OwnCMPBootstrap`.
 
 ## Step 12: Install On The Real Website
 
@@ -436,9 +469,9 @@ Install the runtime snippet before marketing/analytics tags rely on consent.
 
 For GTM-based sites:
 
-- Place the Own CMP runtime before the GTM container when possible.
-- Use `data-google-consent="false"` when the GTM bridge template handles Google Consent Mode updates.
-- Verify the GTM template is installed and configured.
+- Preferred GTM-only path: deploy `gtm/template.tpl` with `Load Own CMP runtime: true`.
+- Bridge-only path: hardcode the Own CMP runtime before the GTM container when possible, set `data-google-consent="false"`, and set the GTM template's `Load Own CMP runtime` field to false.
+- Verify the GTM template is installed and configured on **Consent Initialization - All Pages**.
 
 For non-GTM sites:
 
@@ -454,17 +487,19 @@ Verify first visit:
 - Runtime script loads from `https://cmp.example.com/cmp/owncmp.js`.
 - Config loads from `https://cmp.example.com/api/public/config/:siteId/production`.
 - Banner appears.
+- Persistent cookie preferences icon appears and can reopen the banner.
 - Language, privacy link, category labels, buttons, and corner style are correct.
 - Accept all closes the banner and writes a decision.
 - Reject all closes the banner and writes a decision.
 - Preferences opens localized categories and saves a partial decision.
-- Disclosure link opens localized consent data page.
+- Disclosure link opens the CMP-hosted localized consent data page with the current consent ID.
 
 Verify network:
 
 - `/cmp/owncmp.js` returns `200`.
 - Public config returns `200`.
 - `/api/public/record` returns success on decisions.
+- The consent cookie is named `CleanCmpConsent`.
 - Admin endpoints are not cached.
 - Disclosure history endpoints are not cached.
 
@@ -495,15 +530,18 @@ Minimum operating rule:
 - Create a backup before config migrations.
 - Test restore before the first live launch.
 - Store at least one recent backup outside Railway.
+- Backup filenames include milliseconds so a restore safety backup cannot overwrite the backup being restored during fast operations.
+
+Current status: production backup and restore were manually verified from Admin.
 
 ## Step 15: Monitoring
 
 Monitor these URLs:
 
 ```text
-https://cmp.example.com/cmp/owncmp.js
-https://cmp.example.com/.well-known/gpc.json
-https://cmp.example.com/api/public/config/demo-site/production
+https://cmp.cleancmp.com/cmp/owncmp.js
+https://cmp.cleancmp.com/.well-known/gpc.json
+https://cmp.cleancmp.com/api/public/config/demo-site/production
 ```
 
 Alert on:
@@ -516,6 +554,8 @@ Alert on:
 - failed backup jobs
 
 Admin login failures are already rate limited in the app, but monitor unusual spikes.
+
+Current status: monitoring is deferred and will be configured later.
 
 ## Step 16: Rollback
 

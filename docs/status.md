@@ -1,12 +1,12 @@
 # Project Status
 
-Last updated: 2026-05-12
+Last updated: 2026-05-14
 
 ## Current Stage
 
-Phase 6: Production Deployment Readiness (Next).
+Phase GTM Tag Fix.
 
-The project has completed the Phase 5 operational scale slice: multi-site support, consent reporting, and SQLite-backed durable storage. The next phase is preparing the CMP to run on a real website with secure admin operations, backup/restore, deployment documentation, runtime cache/versioning, and launch verification.
+The project has completed the production hosting baseline, but live GTM testing exposed that the current template/runtime rollout model is not acceptable for real users. The current phase is to make the GTM template a stable production install surface where normal runtime fixes and Admin config updates go live without customer-side GTM URL edits, manual Cloudflare purges, temporary cache-busting URLs, or template re-imports.
 
 ## Current Features
 
@@ -16,13 +16,13 @@ The project has completed the Phase 5 operational scale slice: multi-site suppor
 - **Reporting Dashboard:** Site-scoped accept, reject, partial, and ignore metrics with daily breakdowns.
 - **Consent Retention:** Configurable consent record retention with status and manual purge controls.
 - **Config Management:** Draft editor with automatic versioning, Visual Diff before publishing, active config URLs, and pinned immutable config URLs.
-- **Banner Editor:** Customizable copy, language presets for first-layer text, consent categories, and disclosure text, privacy policy URL, colors, corner style, center/default or bottom layout, logo upload, logo alt text, and custom CSS.
+- **Banner Editor:** Customizable copy, language presets for first-layer text, consent categories, and disclosure text, privacy policy URL, colors, corner style, center/default or bottom layout, persistent preferences icon side, logo upload, logo alt text, and custom CSS.
 - **Consent Logic:** Google Consent Mode v2 mapping with Regional Overrides (e.g. EEA) and optional Shopify Customer Privacy API sync.
 - **Manual Services:** Service-to-category assignment with automatic cookie cleanup patterns.
 - **Proof of Consent:** Server-side append-only records (JSONL) with persistent Consent IDs (CID).
 - **Transparency:** User Self-Disclosure view showing historical decisions trail.
 - **Global Privacy Control:** Runtime detection and public support declaration at `/.well-known/gpc.json`.
-- **Integrations:** Verified GTM Bridge (`.tpl`), WordPress PHP snippet, and Shopify Liquid guide.
+- **Integrations:** GTM Runtime Loader + Consent Mode Bridge (`.tpl`), WordPress PHP snippet, Shopify Liquid guide, and generic direct script snippets.
 - **Dev Tools:** Runtime Test Lab with environment switching (Production vs Preview).
 - **Import/Export:** Full site configuration JSON export and import.
 
@@ -31,7 +31,7 @@ The project has completed the Phase 5 operational scale slice: multi-site suppor
 - Site ID: `demo-site`
 - Site name: `Demo Site`
 - Active environment: `production`
-- Active event name: `cmp.consent_ready`
+- Active event name: `cmp_consent_ready`
 - Active version: `20260508T165641Z`
 
 ## Completed Milestones
@@ -48,9 +48,9 @@ The project has completed the Phase 5 operational scale slice: multi-site suppor
 
 ## Current Milestone
 
-Phase 6: Production Deployment Readiness.
+Phase GTM Tag Fix.
 
-Current focus: continue Phase 6 production hardening. Admin auth hardening, HTTPS-aware session cookies, CSRF protection, login rate limiting, SQLite backup/restore, the production environment guide, runtime cache/versioning, consent record retention, consent record export, and Admin storage/status are implemented; next item is final GTM `.tpl` import and template verification.
+Current focus: redesign the GTM template/runtime handoff so the template injects a stable script URL and runtime settings are passed without dynamic query parameters in the injected URL. Runtime/cache rollout must be owned by the platform, not by customer-side GTM edits or cache purges.
 
 Phase 5 implemented:
 
@@ -91,6 +91,55 @@ Phase 7 planned scope:
 - Backup automation, off-platform backup handling, and restore testing
 - Monitoring, logs, alerts, deployment runbook, and rollback runbook
 - Live website install, GTM bridge verification, public config caching verification, disclosure page verification, GPC verification, and consent record write verification
+
+Phase 7 current status:
+
+- [x] GitHub repository pushed to `jeepleet/own-cmp`
+- [x] Railway service created from GitHub
+- [x] Railway production admin variables configured
+- [x] Railway persistent volume mounted at `/app/data`
+- [x] Railway deployment successful
+- [x] Railway public `/admin/` URL verified
+- [x] Railway public runtime script endpoint verified
+- [x] Railway public GPC endpoint verified
+- [x] Railway public production config endpoint verified after publishing config
+- [x] Production domain `cleancmp.com` purchased in Cloudflare
+- [x] Railway custom domain `cmp.cleancmp.com` configured on port `8080`
+- [x] Cloudflare DNS-only CNAME configured for `cmp.cleancmp.com`
+- [x] HTTPS verified on `https://cmp.cleancmp.com`
+- [x] Cloudflare proxy configured and public endpoints verified
+- [x] Cloudflare cache and bypass rules configured
+- [x] Cloudflare active and pinned production config URLs verified
+- [x] Cloudflare GPC declaration verified
+- [ ] Direct website snippet installed and verified
+- [x] GTM Runtime Loader + Consent Mode Bridge imported and verified on live test domain `jeppeskaffe.dk`
+- [x] GTM runtime cache-busted URL verified after Cloudflare/browser cache issue
+- [x] GTM bridge consent update ordering fixed so the update is applied before `cmp_consent_ready`
+- [x] GTM template listener registration added through `OwnCMP.onReady` / `OwnCMP.onChange`
+- [x] Stable `OwnCMPAddConsentListener` hook added for GTM callback registration
+- [x] GTM deployment-mode direct Consent Mode update fallback added
+- [x] GTM Consent Mode update verified after direct fallback fix
+- [x] Local SQLite backup/restore smoke test passed and safety-backup filename collision fixed
+- [x] Production backup and restore procedure verified from Admin
+- [x] Disclosure link fixed for GTM/cross-domain installs
+- [x] Persistent cookie preferences icon added with left/right Admin control
+- [x] Consent cookie renamed to `CleanCmpConsent` with legacy-cookie migration
+- [x] Overview runtime metric removed from Admin
+- [x] Preferences icon positioning, colored cookie/check icon, and event-name fallback hardened after live cache verification
+- [x] Disclosure history page hardened for records without category decisions
+- [x] Draft -> Release workflow documented in `docs/workflow.md`
+- [ ] Monitoring configured later
+
+Phase GTM Tag Fix planned scope:
+
+- [x] Design stable GTM injection URL with no dynamic query parameters.
+- [x] Move `siteId`, active config URL, dataLayer name, and Consent Mode flags into a stable bootstrap handoff.
+- [x] Add runtime support for that bootstrap handoff while preserving existing direct script installs.
+- [x] Update GTM template permissions to match the stable injected URL only.
+- [x] Update server/Cloudflare cache strategy so normal runtime fixes deploy without manual purge.
+- [x] Add tests for stable GTM URL building, bootstrap handoff, active config loading, dataLayer event output, and disclosure history.
+- [ ] Verify live GTM Preview without temporary `?v=...` runtime URLs.
+- [ ] Document final production install steps for customers.
 
 Phase 6 planned scope:
 

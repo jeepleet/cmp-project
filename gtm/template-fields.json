@@ -1,8 +1,44 @@
 {
-  "templateName": "Own CMP Consent Mode Bridge",
+  "templateName": "Own CMP Runtime Loader + Consent Mode Bridge",
   "tagType": "web",
   "recommendedTrigger": "Consent Initialization - All Pages",
   "fields": [
+    {
+      "name": "loadRuntime",
+      "type": "select",
+      "displayName": "Load Own CMP runtime",
+      "options": ["true", "false"],
+      "defaultValue": "true",
+      "help": "Use true when GTM should deploy the CMP script. Use false only when the script is hardcoded on the page."
+    },
+    {
+      "name": "runtimeUrl",
+      "type": "text",
+      "displayName": "Runtime script URL",
+      "defaultValue": "https://cmp.cleancmp.com/cmp/owncmp.js",
+      "help": "Full URL to the Own CMP runtime script."
+    },
+    {
+      "name": "siteId",
+      "type": "text",
+      "displayName": "Site ID",
+      "defaultValue": "demo-site",
+      "help": "Own CMP site ID."
+    },
+    {
+      "name": "configUrl",
+      "type": "text",
+      "displayName": "Production config URL",
+      "defaultValue": "https://cmp.cleancmp.com/api/public/config/demo-site/production",
+      "help": "Active or pinned production config URL."
+    },
+    {
+      "name": "dataLayerName",
+      "type": "text",
+      "displayName": "dataLayer name",
+      "defaultValue": "dataLayer",
+      "help": "Name of the dataLayer array used by the website."
+    },
     {
       "name": "region",
       "type": "text",
@@ -95,17 +131,18 @@
     },
     {
       "permission": "access_globals",
-      "access": "execute",
-      "keys": ["OwnCMP.onReady", "OwnCMP.onChange"]
-    },
-    {
-      "permission": "access_globals",
-      "access": "write",
-      "keys": ["OwnCMPGtmBridge"]
+      "access": "any",
+      "keys": ["OwnCMPBootstrap", "OwnCMPGtmBridge", "OwnCMPAddConsentListener", "OwnCMP.onReady", "OwnCMP.onChange"]
     },
     {
       "permission": "write_data_layer",
       "notes": "Needed indirectly by Google consent APIs and gtagSet in GTM."
+    },
+    {
+      "permission": "inject_script",
+      "urls": [
+        "https://cmp.cleancmp.com/cmp/owncmp.js"
+      ]
     }
   ]
 }

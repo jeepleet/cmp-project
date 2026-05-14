@@ -1,9 +1,10 @@
 const setDefaultConsentState = require("setDefaultConsentState");
 const updateConsentState = require("updateConsentState");
-const callInWindow = require("callInWindow");
 const setInWindow = require("setInWindow");
+const callInWindow = require("callInWindow");
 const gtagSet = require("gtagSet");
 const makeNumber = require("makeNumber");
+const injectScript = require("injectScript");
 
 const CONSENT_TYPES = [
   "ad_storage",
@@ -32,6 +33,16 @@ const splitInput = (input) => {
     .filter((entry) => entry);
 };
 
+const stableScriptUrl = (input) => {
+  const url = input || "";
+  const queryIndex = url.indexOf("?");
+  const hashIndex = url.indexOf("#");
+  let end = url.length;
+  if (queryIndex !== -1 && queryIndex < end) end = queryIndex;
+  if (hashIndex !== -1 && hashIndex < end) end = hashIndex;
+  return url.substring(0, end);
+};
+
 const normalizeConsent = (record) => {
   const source = record && record.googleConsent
     ? record.googleConsent
@@ -53,6 +64,14 @@ const applyConsentUpdate = (record) => {
   if (consent) updateConsentState(consent);
 };
 
+const registerRuntimeListeners = () => {
+  const registered = callInWindow("OwnCMPAddConsentListener", applyConsentUpdate);
+  if (registered !== true) {
+    callInWindow("OwnCMP.onReady", applyConsentUpdate);
+    callInWindow("OwnCMP.onChange", applyConsentUpdate);
+  }
+};
+
 const buildDefaultState = () => {
   const state = {};
   CONSENT_TYPES.forEach((type) => {
@@ -66,6 +85,18 @@ const buildDefaultState = () => {
   return state;
 };
 
+const runtimeUrl = stableScriptUrl(data.runtimeUrl || "https://cmp.cleancmp.com/cmp/owncmp.js");
+const siteId = data.siteId || "demo-site";
+const configUrl = data.configUrl || "https://cmp.cleancmp.com/api/public/config/demo-site/production";
+
+const bootstrapSettings = {
+  siteId,
+  configUrl,
+  dataLayerName: data.dataLayerName || "dataLayer",
+  googleConsent: false,
+  gtmConsentFallback: true
+};
+
 if (data.adsDataRedaction !== "inherit") {
   gtagSet("ads_data_redaction", data.adsDataRedaction === "true");
 }
@@ -77,7 +108,14 @@ if (data.urlPassthrough !== "inherit") {
 setDefaultConsentState(buildDefaultState());
 
 setInWindow("OwnCMPGtmBridge", applyConsentUpdate, true);
-callInWindow("OwnCMP.onReady", applyConsentUpdate);
-callInWindow("OwnCMP.onChange", applyConsentUpdate);
+setInWindow("OwnCMPBootstrap", bootstrapSettings, true);
 
-data.gtmOnSuccess();
+if (data.loadRuntime === "false") {
+  registerRuntimeListeners();
+  data.gtmOnSuccess();
+} else {
+  injectScript(runtimeUrl, () => {
+    registerRuntimeListeners();
+    data.gtmOnSuccess();
+  }, data.gtmOnFailure, "owncmp-runtime-" + siteId);
+}

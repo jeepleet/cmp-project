@@ -1,5 +1,50 @@
 # Changelog
 
+## 2026-05-14
+
+### Added
+
+- Added a persistent cookie preferences icon to the runtime so visitors can reopen the banner after making a choice.
+- Added a Banner setting for placing the preferences icon on the left or right side of the website.
+- Added `docs/workflow.md` to document the Draft -> Release workflow, required Markdown updates, and required test guidance.
+- Added `docs/phase-gtm-tag-fix.md` to define the new Phase GTM Tag Fix requirements for a stable production GTM install surface.
+- Added `window.OwnCMPBootstrap` as the stable GTM-to-runtime handoff for `siteId`, config URL, dataLayer name, and GTM Consent Mode flags.
+
+### Changed
+
+- Renamed the Own CMP consent cookie to `CleanCmpConsent`.
+- Runtime now migrates existing legacy `owncmp_consent_:siteId` cookies into `CleanCmpConsent`.
+- Disclosure links now point to the CMP-hosted disclosure page and include the current consent ID, so consent history works when the CMP is installed through GTM on another domain.
+- Removed the Admin Overview `Runtime / Vanilla JS` metric card.
+- Reframed GTM runtime rollout requirements: normal code fixes must not require customer GTM URL edits, temporary cache-busting URLs, manual Cloudflare purges, or template re-imports.
+- GTM deployment mode now injects the stable runtime URL without dynamic query parameters.
+- GTM deployment mode strips query strings and hashes from the Runtime script URL field before injection.
+- GTM template `inject_script` permission now targets only `https://cmp.cleancmp.com/cmp/owncmp.js`.
+- Runtime script responses now use `Cache-Control: public, no-cache, must-revalidate`.
+- Runtime settings are resolved from `data-*` attributes first, `window.OwnCMPBootstrap` second, and legacy query parameters last.
+- Admin GTM snippets now document the `window.OwnCMPBootstrap` handoff and warn against query parameters on the runtime URL.
+- Added a GTM template regression test for the stable bootstrap handoff and query-free injected runtime URL.
+
+### Fixed
+
+- Fixed `window.OwnCMP.getConfig()` so it returns the current config instead of reopening the banner.
+- Fixed the preferences icon so it updates left/right placement when the public config changes and uses a clearer cookie-style visual.
+- Fixed the preferences icon side control so left/right placement is applied explicitly at runtime.
+- Replaced the inherited white preferences icon with a colored cookie/check visual.
+- Normalized legacy `owncmp_consent_ready`, `owncmp.consent_ready`, and previous `cmp.consent_ready` values to `cmp_consent_ready` so old values do not leak into the dataLayer after the Admin event name has changed.
+- Fixed the disclosure history page so banner-view or legacy history records without category decisions render safely instead of throwing `Cannot convert undefined or null to object`.
+
+## 2026-05-13
+
+### Fixed
+
+- Fixed GTM Consent Mode bridge ordering by calling `OwnCMPGtmBridge` before pushing the canonical `owncmp.consent_ready` dataLayer event. GTM can now apply `updateConsentState` before processing that event instead of only affecting later events.
+- Added a primary GTM listener path through `OwnCMP.onReady` and `OwnCMP.onChange` using `callInWindow`, while keeping `OwnCMPGtmBridge` as a fallback for Consent Mode updates.
+- Added `OwnCMPAddConsentListener` as a stable GTM callback registration hook and moved runtime listener notifications before the consent-ready dataLayer event.
+- Added a GTM deployment fallback query parameter, `gtmConsentFallback=true`, so the runtime can push a direct Consent Mode update before the consent-ready event if GTM's sandbox callback update is not reflected in Preview.
+- Fixed SQLite backup filename precision so a restore safety backup cannot collide with another backup created in the same second.
+- Verified the production backup and restore workflow from Admin.
+
 ## 2026-05-12
 
 ### Added
@@ -13,6 +58,21 @@
 - Banner corner style control with round, semi-round, and square options.
 - Roadmap Phase 7 for real website go-live, covering hosting, deployment, persistence, monitoring, and live verification.
 - Complete Phase 7 Railway + Cloudflare go-live runbook with volume path, environment variables, DNS, cache rules, security rules, snippets, verification, backups, monitoring, and rollback.
+- Phase 7 status tracking for GitHub push, Railway service creation, production admin variables, `/app/data` volume, successful deployment, and Railway public Admin verification.
+- Added missing public GPC declaration file at `/.well-known/gpc.json`.
+- Verified Railway public runtime script, GPC declaration, and published production config endpoints.
+- Recorded `cleancmp.com` as the selected Cloudflare production domain for Phase 7.
+- Connected `cmp.cleancmp.com` to Railway on port `8080` with DNS-only Cloudflare CNAME and verified HTTPS.
+- Enabled Cloudflare proxy for `cmp.cleancmp.com` and verified Admin, runtime script, GPC declaration, and production config through the proxied hostname.
+- Configured Cloudflare cache and bypass rules for private/write endpoints, runtime script, active production config, public config fallback for pinned versions, and GPC declaration.
+- Verified active production config, pinned production config, and GPC declaration through Cloudflare.
+- Upgraded the GTM template from bridge-only to **Own CMP Runtime Loader + Consent Mode Bridge** with runtime URL, site ID, config URL, runtime load toggle, and `inject_script` permission.
+- Runtime now accepts GTM-injected query parameters for `siteId`, `configUrl`, `dataLayer`, and `googleConsent`, while preserving hardcoded `data-*` attributes.
+- Fixed GTM preview permission failure by allowing read/write global access for `OwnCMPGtmBridge`.
+- Hardened runtime banner actions so non-critical GTM bridge, listener, record dispatch, Shopify sync, or cookie cleanup errors cannot prevent the banner from closing.
+- Initialized `dataLayer` before emitting Own CMP events when the runtime is injected by GTM.
+- Removed direct `OwnCMP.onReady` / `OwnCMP.onChange` listener registration from the GTM template to avoid GTM preview invoking the consent bridge with an undefined or unexpected record.
+- Verified GTM Runtime Loader + Consent Mode Bridge on `jeppeskaffe.dk` with a cache-busted runtime URL after Cloudflare/browser cache served an older runtime.
 
 ## 2026-05-11
 

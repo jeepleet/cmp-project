@@ -89,10 +89,6 @@
                 <span>Published</span>
                 <strong id="metric-published">-</strong>
               </div>
-              <div class="metric">
-                <span>Runtime</span>
-                <strong>Vanilla JS</strong>
-              </div>
             </div>
             <div class="runtime-contract">
               <h3>dataLayer event</h3>
@@ -174,7 +170,13 @@
                   <option value="square">Square</option>
                 </select>
               </label>
-              <div></div>
+              <label>
+                Preference icon side
+                <select name="banner.reopenButtonPosition">
+                  <option value="right">Right</option>
+                  <option value="left">Left</option>
+                </select>
+              </label>
               <label class="span-2">
                 Logo
                 <input id="banner-logo-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
@@ -509,18 +511,18 @@
             <div class="section-head">
               <div>
                 <h2>Snippets</h2>
-                <p>Website install code and GTM trigger basis.</p>
+                <p>Direct script install code and GTM template settings.</p>
               </div>
             </div>
             <h3>Website script</h3>
             <pre id="script-snippet"></pre>
             <h3>Pinned production script</h3>
             <pre id="pinned-script-snippet"></pre>
-            <h3>Website script when using the GTM bridge</h3>
+            <h3>Direct website script when using the GTM bridge only</h3>
             <pre id="gtm-script-snippet"></pre>
-            <h3>Pinned production script when using the GTM bridge</h3>
+            <h3>Direct pinned production script when using the GTM bridge only</h3>
             <pre id="pinned-gtm-script-snippet"></pre>
-            <h3>GTM custom event</h3>
+            <h3>GTM template install</h3>
             <pre id="gtm-snippet"></pre>
           </section>
 

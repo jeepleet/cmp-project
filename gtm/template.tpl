@@ -10,7 +10,7 @@ ___INFO___
   "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
-  "displayName": "Own CMP Consent Mode Bridge",
+  "displayName": "Own CMP Runtime Loader + Consent Mode Bridge",
   "brand": {
     "id": "brand_dummy",
     "displayName": "Own CMP",
@@ -29,6 +29,59 @@ ___INFO___
 
 ___TEMPLATE_PARAMETERS___
 [
+  {
+    "type": "SELECT",
+    "name": "loadRuntime",
+    "displayName": "Load Own CMP runtime",
+    "simpleValueType": true,
+    "selectItems": [
+      {
+        "value": "true",
+        "displayValue": "true"
+      },
+      {
+        "value": "false",
+        "displayValue": "false"
+      }
+    ],
+    "defaultValue": "true"
+  },
+  {
+    "type": "TEXT",
+    "name": "runtimeUrl",
+    "displayName": "Runtime script URL",
+    "simpleValueType": true,
+    "valueHint": "https://cmp.cleancmp.com/cmp/owncmp.js",
+    "help": "Full URL to the Own CMP runtime script.",
+    "defaultValue": "https://cmp.cleancmp.com/cmp/owncmp.js"
+  },
+  {
+    "type": "TEXT",
+    "name": "siteId",
+    "displayName": "Site ID",
+    "simpleValueType": true,
+    "valueHint": "demo-site",
+    "help": "Own CMP site ID.",
+    "defaultValue": "demo-site"
+  },
+  {
+    "type": "TEXT",
+    "name": "configUrl",
+    "displayName": "Production config URL",
+    "simpleValueType": true,
+    "valueHint": "https://cmp.cleancmp.com/api/public/config/demo-site/production",
+    "help": "Active or pinned production config URL.",
+    "defaultValue": "https://cmp.cleancmp.com/api/public/config/demo-site/production"
+  },
+  {
+    "type": "TEXT",
+    "name": "dataLayerName",
+    "displayName": "dataLayer name",
+    "simpleValueType": true,
+    "valueHint": "dataLayer",
+    "help": "Name of the dataLayer array used by the website.",
+    "defaultValue": "dataLayer"
+  },
   {
     "type": "TEXT",
     "name": "region",
@@ -213,10 +266,11 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 const setDefaultConsentState = require("setDefaultConsentState");
 const updateConsentState = require("updateConsentState");
-const callInWindow = require("callInWindow");
 const setInWindow = require("setInWindow");
+const callInWindow = require("callInWindow");
 const gtagSet = require("gtagSet");
 const makeNumber = require("makeNumber");
+const injectScript = require("injectScript");
 
 const CONSENT_TYPES = [
   "ad_storage",
@@ -245,6 +299,16 @@ const splitInput = (input) => {
     .filter((entry) => entry);
 };
 
+const stableScriptUrl = (input) => {
+  const url = input || "";
+  const queryIndex = url.indexOf("?");
+  const hashIndex = url.indexOf("#");
+  let end = url.length;
+  if (queryIndex !== -1 && queryIndex < end) end = queryIndex;
+  if (hashIndex !== -1 && hashIndex < end) end = hashIndex;
+  return url.substring(0, end);
+};
+
 const normalizeConsent = (record) => {
   const source = record && record.googleConsent
     ? record.googleConsent
@@ -266,6 +330,14 @@ const applyConsentUpdate = (record) => {
   if (consent) updateConsentState(consent);
 };
 
+const registerRuntimeListeners = () => {
+  const registered = callInWindow("OwnCMPAddConsentListener", applyConsentUpdate);
+  if (registered !== true) {
+    callInWindow("OwnCMP.onReady", applyConsentUpdate);
+    callInWindow("OwnCMP.onChange", applyConsentUpdate);
+  }
+};
+
 const buildDefaultState = () => {
   const state = {};
   CONSENT_TYPES.forEach((type) => {
@@ -279,6 +351,18 @@ const buildDefaultState = () => {
   return state;
 };
 
+const runtimeUrl = stableScriptUrl(data.runtimeUrl || "https://cmp.cleancmp.com/cmp/owncmp.js");
+const siteId = data.siteId || "demo-site";
+const configUrl = data.configUrl || "https://cmp.cleancmp.com/api/public/config/demo-site/production";
+
+const bootstrapSettings = {
+  siteId,
+  configUrl,
+  dataLayerName: data.dataLayerName || "dataLayer",
+  googleConsent: false,
+  gtmConsentFallback: true
+};
+
 if (data.adsDataRedaction !== "inherit") {
   gtagSet("ads_data_redaction", data.adsDataRedaction === "true");
 }
@@ -290,10 +374,17 @@ if (data.urlPassthrough !== "inherit") {
 setDefaultConsentState(buildDefaultState());
 
 setInWindow("OwnCMPGtmBridge", applyConsentUpdate, true);
-callInWindow("OwnCMP.onReady", applyConsentUpdate);
-callInWindow("OwnCMP.onChange", applyConsentUpdate);
+setInWindow("OwnCMPBootstrap", bootstrapSettings, true);
 
-data.gtmOnSuccess();
+if (data.loadRuntime === "false") {
+  registerRuntimeListeners();
+  data.gtmOnSuccess();
+} else {
+  injectScript(runtimeUrl, () => {
+    registerRuntimeListeners();
+    data.gtmOnSuccess();
+  }, data.gtmOnFailure, "owncmp-runtime-" + siteId);
+}
 
 
 ___WEB_PERMISSIONS___
@@ -333,54 +424,15 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "OwnCMP.onReady"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
+                    "string": "OwnCMPBootstrap"
                   },
                   {
                     "type": 8,
                     "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "OwnCMP.onChange"
                   },
                   {
                     "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
+                    "boolean": true
                   },
                   {
                     "type": 8,
@@ -415,7 +467,7 @@ ___WEB_PERMISSIONS___
                   },
                   {
                     "type": 8,
-                    "boolean": false
+                    "boolean": true
                   },
                   {
                     "type": 8,
@@ -423,7 +475,124 @@ ___WEB_PERMISSIONS___
                   },
                   {
                     "type": 8,
-                    "boolean": false
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "OwnCMPAddConsentListener"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "OwnCMP.onReady"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "OwnCMP.onChange"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
                   }
                 ]
               }
@@ -696,6 +865,32 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "inject_script",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "urls",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "https://cmp.cleancmp.com/cmp/owncmp.js"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -703,4 +898,4 @@ ___TESTS___
 scenarios: []
 
 ___NOTES___
-Built on 2026-05-08T16:43:34.636Z
+Built on 2026-05-14T16:10:39.717Z

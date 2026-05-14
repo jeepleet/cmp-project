@@ -396,13 +396,14 @@ function bindActions() {
 
   safeListen("#datalayer-event", "input", (event) => {
     if (state.config) {
-      state.config.dataLayer.eventName = event.target.value.trim() || "owncmp.consent_ready";
+      state.config.dataLayer.eventName = normalizeConsentEventName(event.target.value.trim());
       markDirty();
+      renderOverview();
       renderSnippets();
     }
   });
 
-  safeListen("#banner-form", "input", (event) => {
+  const handleBannerFormInput = (event) => {
     const target = event.target;
     if (!target.name || !state.config) return;
     if (target.name === "banner.positionCenter" || target.name === "banner.positionBottom") {
@@ -420,7 +421,10 @@ function bindActions() {
     markDirty();
     renderOverview();
     renderSnippets();
-  });
+  };
+
+  safeListen("#banner-form", "input", handleBannerFormInput);
+  safeListen("#banner-form", "change", handleBannerFormInput);
 
   safeListen("#banner-language", "change", (event) => {
     if (!state.config) return;
@@ -735,6 +739,11 @@ function renderOverview() {
   };
   qs("#event-preview").textContent = JSON.stringify(eventPreview, null, 2);
   renderDiff();
+}
+
+function normalizeConsentEventName(value) {
+  if (value === "owncmp_consent_ready" || value === "owncmp.consent_ready" || value === "cmp.consent_ready") return "cmp_consent_ready";
+  return value || "cmp_consent_ready";
 }
 
 function renderDiff() {
@@ -1205,11 +1214,25 @@ function renderSnippets() {
   data-google-consent="false">
 </script>` : "Publish this site once to generate a pinned GTM production config URL.";
 
-  qs("#gtm-snippet").textContent = `Consent bridge template source: gtm/own-cmp-consent-mode-template-code.js
+  qs("#gtm-snippet").textContent = `Import GTM template: gtm/template.tpl
+Template: Own CMP Runtime Loader + Consent Mode Bridge
 Trigger: Consent Initialization - All Pages
+Load Own CMP runtime: true
+Runtime script URL: ${origin}/cmp/owncmp.js
+Site ID: ${state.config.siteId}
+Production config URL: ${activeConfigUrl}
+dataLayer name: dataLayer
+Use pinned config URL for controlled launches: ${pinnedConfigUrl || "Publish first to generate pinned URL"}
 Custom Event trigger for consent-dependent tags: ${state.config.dataLayer.eventName}
 Useful filter: owncmp.hasDecision equals true
-Google signals are available at: owncmp.googleConsent`;
+Google signals are available at: owncmp.googleConsent
+Runtime settings are passed through window.OwnCMPBootstrap. Do not add query parameters to the Runtime script URL.
+
+If the runtime is hardcoded on the website instead, set "Load Own CMP runtime" to false and keep data-google-consent="false" on the hardcoded script.
+
+Legacy bridge source: gtm/own-cmp-consent-mode-template-code.js
+Trigger: Consent Initialization - All Pages
+`;
 }
 
 function addService() {

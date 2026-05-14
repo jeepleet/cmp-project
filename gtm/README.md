@@ -1,13 +1,15 @@
-# Own CMP GTM Consent Mode Bridge
+# Own CMP GTM Runtime Loader + Consent Mode Bridge
 
 This folder contains the first GTM custom template source pack for Own CMP.
 
-The template is a **bridge**, not the main CMP runtime. The recommended setup is:
+The template can now run in two modes:
 
-1. Load `public/cmp/owncmp.js` directly on the page.
-2. Import `gtm/template.tpl` into your GTM container.
-3. Fire the template on `Consent Initialization - All Pages`.
-4. Set the Own CMP script attribute `data-google-consent="false"` so Google consent updates are handled by GTM's consent APIs.
+- **GTM deployment mode:** the template injects the Own CMP runtime script and handles Google Consent Mode defaults/updates through GTM consent APIs.
+- **Bridge-only mode:** the website hardcodes `public/cmp/owncmp.js`, and the template only handles Google Consent Mode updates. Use this when a site owner wants the runtime to load before GTM or cannot inject it from GTM.
+
+For most GTM-only installations, use GTM deployment mode.
+
+In both modes, the template registers its consent update callback with `window.OwnCMPAddConsentListener` when the runtime is available. Older runtime listener APIs (`window.OwnCMP.onReady` and `window.OwnCMP.onChange`) and `window.OwnCMPGtmBridge` remain fallback paths. In GTM deployment mode, the template sets `window.OwnCMPBootstrap` and injects the stable runtime URL without query parameters. The bootstrap includes the direct Consent Mode fallback flag, allowing the runtime to push a direct Consent Mode update before the canonical consent-ready dataLayer event if the sandbox callback path does not surface in Preview.
 
 ## Installation
 
@@ -19,7 +21,20 @@ The template is a **bridge**, not the main CMP runtime. The recommended setup is
 4. In the top right menu (three dots), select **Import**.
 5. Select the `gtm/template.tpl` file from this repository.
 6. Click **Save**.
-7. Create a new tag using this template and fire it on **Consent Initialization - All Pages**.
+7. Create a new tag using this template.
+8. Fire it on **Consent Initialization - All Pages**.
+9. Set:
+
+```text
+Load Own CMP runtime: true
+Runtime script URL: https://cmp.cleancmp.com/cmp/owncmp.js
+Site ID: demo-site
+Production config URL: https://cmp.cleancmp.com/api/public/config/demo-site/production
+dataLayer name: dataLayer
+```
+
+For controlled launches, use the pinned production config URL from Admin instead of the active production config URL.
+Do not add cache-busting query parameters to the runtime script URL. The template strips query strings and hashes from that field before injection, passes runtime settings through `window.OwnCMPBootstrap`, and the `inject_script` permission is intentionally limited to the stable runtime URL.
 
 ### Build from source
 
@@ -31,30 +46,36 @@ npm run build:gtm
 
 The build script combines `gtm/own-cmp-consent-mode-template-code.js` and `gtm/template-fields.json` into the final `gtm/template.tpl`.
 
-## Website Runtime Snippet For GTM Setups
+## Bridge-Only Website Runtime Snippet
 
 ```html
 <script
-  src="https://your-cmp-domain.example/cmp/owncmp.js"
+  src="https://cmp.cleancmp.com/cmp/owncmp.js"
   data-site-id="demo-site"
-  data-config-url="https://your-cmp-domain.example/api/public/config/demo-site/production"
+  data-config-url="https://cmp.cleancmp.com/api/public/config/demo-site/production"
   data-google-consent="false">
 </script>
 ```
 
-Use the non-deferred form above before the GTM container snippet when possible. The runtime is intentionally small and sets up `window.OwnCMP` immediately; the config fetch and banner rendering happen asynchronously.
+Use this only when the runtime is hardcoded on the website and the GTM template is set to:
+
+```text
+Load Own CMP runtime: false
+```
+
+Place the hardcoded script before the GTM container snippet when possible. The runtime is intentionally small and sets up `window.OwnCMP` immediately; the config fetch and banner rendering happen asynchronously.
 
 For controlled launches, replace the active production config URL with the pinned version URL shown in Admin:
 
 ```html
-data-config-url="https://your-cmp-domain.example/api/public/config/demo-site/production/20260508T165641Z"
+data-config-url="https://cmp.cleancmp.com/api/public/config/demo-site/production/20260508T165641Z"
 ```
 
 Pinned config URLs are immutable and can be cached long-term. Active production URLs update automatically after publish and use short revalidated caching.
 
 ## Current Limitations
 
-- `gtm/template.tpl` exists, but it still needs manual import verification inside GTM.
+- `gtm/template.tpl` exists, but it still needs manual import verification inside GTM after the runtime loader change.
 - The generated `.tpl` currently uses an empty `scenarios: []` test block to keep import validation simple. Add editor-native unit tests after import succeeds.
 - Region-specific defaults are supported in the runtime config and admin UI; the GTM bridge still uses one optional comma-separated region field for its own defaults.
 

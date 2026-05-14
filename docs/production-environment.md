@@ -140,7 +140,7 @@ When using the GTM bridge with the active production URL:
 </script>
 ```
 
-Pinned GTM installs use the same versioned config URL and keep `data-google-consent="false"`.
+Pinned direct-script GTM bridge installs use the same versioned config URL and keep `data-google-consent="false"`.
 
 ## Runtime Cache and Versioning
 
@@ -153,7 +153,13 @@ Active production responses use short public caching with `ETag`, `Last-Modified
 
 Pinned production responses are immutable and can be cached for one year because a publish version never changes. Use pinned URLs when a release needs an explicit change-control step.
 
-The runtime script at `/cmp/owncmp.js` uses short public caching with validators. Keep this URL stable unless introducing a separate runtime release path later.
+The runtime script at `/cmp/owncmp.js` is the stable GTM install URL and uses validators with:
+
+```text
+Cache-Control: public, no-cache, must-revalidate
+```
+
+Keep this URL stable for GTM installs. The GTM template passes install settings through `window.OwnCMPBootstrap`, not query parameters, so normal runtime fixes should deploy through revalidation instead of customer-side URL edits.
 
 ## Consent Record Retention
 

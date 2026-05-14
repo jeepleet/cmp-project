@@ -1,6 +1,6 @@
 # Global Privacy Control
 
-Last updated: 2026-05-08
+Last updated: 2026-05-12
 
 ## Current Implementation
 
@@ -26,7 +26,7 @@ Current response:
 ```json
 {
   "gpc": true,
-  "lastUpdate": "2026-05-08"
+  "lastUpdate": "2026-05-12"
 }
 ```
 

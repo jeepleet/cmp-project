@@ -69,6 +69,13 @@ async function build() {
     ]));
   }
 
+  const injectScriptUrls = fields.permissions.find(p => p.permission === "inject_script")?.urls || [];
+  if (injectScriptUrls.length > 0) {
+    permissions.push(permission("inject_script", [
+      { key: "urls", value: gtmList(injectScriptUrls.map(gtmString)) }
+    ]));
+  }
+
   const terms = [
     "By creating or modifying this file you agree to Google Tag Manager's Community",
     "Template Gallery Developer Terms of Service available at",

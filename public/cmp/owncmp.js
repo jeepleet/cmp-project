@@ -4,10 +4,12 @@
   if (window.performance && performance.mark) performance.mark("owncmp-init");
 
   var script = document.currentScript || lastScript();
+  var bootstrap = window.OwnCMPBootstrap && typeof window.OwnCMPBootstrap === "object" ? window.OwnCMPBootstrap : {};
   var siteId = attr("data-site-id", "demo-site");
   var configUrl = attr("data-config-url", "/api/public/config/" + encodeURIComponent(siteId) + "/production");
   var dataLayerName = attr("data-layer", "dataLayer");
   var manageGoogleConsent = attr("data-google-consent", "true") !== "false";
+  var gtmConsentFallback = attr("data-gtm-consent-fallback", "false") === "true";
   var api = createApi();
   var pendingCid = null;
   var bannerRecordSent = false;
@@ -23,6 +25,10 @@
   };
 
   window.OwnCMP = api;
+  window.OwnCMPAddConsentListener = function (listener) {
+    api.addConsentListener(listener);
+    return true;
+  };
   window[dataLayerName] = window[dataLayerName] || [];
   if (manageGoogleConsent) {
     setGoogleConsent("default", withWait(fallbackGoogleState, 500));
@@ -40,6 +46,7 @@
   function start(config) {
     api._config = config;
     api._siteId = config.siteId || siteId;
+    renderReopenButton(config);
 
     if (manageGoogleConsent && config.googleConsentMode && Array.isArray(config.googleConsentMode.regionalOverrides)) {
       config.googleConsentMode.regionalOverrides.forEach(function (override) {
@@ -74,7 +81,7 @@
     var banner = config.banner || {};
     var theme = banner.theme || {};
     var privacyPolicyUrl = safeHttpUrl(banner.privacyPolicyUrl);
-    var disclosureUrl = "/disclosure.html?siteId=" + encodeURIComponent(config.siteId || siteId);
+    var disclosureUrl = disclosurePageUrl(config);
     var radius = bannerRadius(banner.cornerStyle);
     var root = document.createElement("div");
     root.id = "owncmp-root";
@@ -166,27 +173,28 @@
   function choose(config, categories, source, action) {
     if (window.performance && performance.mark) performance.mark("owncmp-interaction");
     var record = buildRecord(config, categories, source, action);
-    writeStoredConsent(config, record);
-    applyConsent(config, record, source);
-    syncShopifyCustomerPrivacy(config, record);
-    dispatchRecord(config, record);
-    cleanupDeniedCookies(config, categories);
-    closeBanner();
+    try {
+      writeStoredConsent(config, record);
+      safeRun(function () { applyConsent(config, record, source); });
+      safeRun(function () { syncShopifyCustomerPrivacy(config, record); });
+      safeRun(function () { dispatchRecord(config, record); });
+      safeRun(function () { cleanupDeniedCookies(config, categories); });
+    } finally {
+      closeBanner();
+    }
   }
 
   function applyConsent(config, record, source) {
     var googleConsent = mapGoogleConsent(config, record.categories);
     record.googleConsent = googleConsent;
 
-    if (manageGoogleConsent) {
+    if (manageGoogleConsent || gtmConsentFallback) {
       setGoogleConsent("update", googleConsent);
     }
-    emitReady(config, record, source);
     api._consent = record;
-    api._listeners.forEach(function (listener) {
-      listener(record);
-    });
     notifyGtmBridge(record);
+    notifyConsentListeners(record);
+    emitReady(config, record, source);
   }
 
   function dispatchBannerShown(config, gpcActive) {
@@ -286,7 +294,8 @@
   }
 
   function emitReady(config, record, source) {
-    var eventName = config.dataLayer && config.dataLayer.eventName || "owncmp.consent_ready";
+    var eventName = consentEventName(config);
+    window[dataLayerName] = window[dataLayerName] || [];
     window[dataLayerName].push({
       event: eventName,
       owncmp: {
@@ -311,8 +320,14 @@
 
   function notifyGtmBridge(record) {
     if (typeof window.OwnCMPGtmBridge === "function") {
-      window.OwnCMPGtmBridge(record);
+      safeRun(function () { window.OwnCMPGtmBridge(record); });
     }
+  }
+
+  function notifyConsentListeners(record) {
+    api._listeners.forEach(function (listener) {
+      safeRun(function () { listener(record); });
+    });
   }
 
   function withWait(state, waitMs) {
@@ -361,12 +376,18 @@
   }
 
   function readStoredConsent(config) {
+    var legacy = false;
     var raw = readCookie(cookieName(config));
+    if (!raw) {
+      raw = readCookie(legacyCookieName(config));
+      legacy = Boolean(raw);
+    }
     if (!raw) return null;
 
     try {
       var parsed = JSON.parse(raw);
       if (!parsed || parsed.siteId !== (config.siteId || siteId) || !parsed.categories) return null;
+      if (legacy) writeStoredConsent(config, parsed);
       return parsed;
     } catch (_) {
       return null;
@@ -377,6 +398,7 @@
     var ttl = Number(config.consentTtlDays || 180);
     var encoded = encodeURIComponent(JSON.stringify(record));
     document.cookie = cookieName(config) + "=" + encoded + "; Path=/; Max-Age=" + ttl * 86400 + "; SameSite=Lax";
+    expireCookie(legacyCookieName(config));
   }
 
   function readCookie(name) {
@@ -391,7 +413,15 @@
   }
 
   function cookieName(config) {
-    return (config.consentCookieName || "owncmp_consent") + "_" + (config.siteId || siteId);
+    return "CleanCmpConsent";
+  }
+
+  function legacyCookieName(config) {
+    return (config.consentCookieName && config.consentCookieName !== "CleanCmpConsent" ? config.consentCookieName : "owncmp_consent") + "_" + (config.siteId || siteId);
+  }
+
+  function expireCookie(name) {
+    document.cookie = name + "=; Path=/; Max-Age=0; SameSite=Lax";
   }
 
   function getPendingCid(config) {
@@ -442,6 +472,35 @@
     }
   }
 
+  function renderReopenButton(config) {
+    var banner = config.banner || {};
+    var side = banner.reopenButtonPosition === "left" ? "left" : "right";
+    var button = document.getElementById("owncmp-reopen") || document.createElement("button");
+    button.id = "owncmp-reopen";
+    button.type = "button";
+    button.className = "owncmp-reopen owncmp-reopen-" + side;
+    button.setAttribute("aria-label", banner.preferencesText || "Cookie preferences");
+    button.innerHTML = [
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+      '<path d="M12 3.2a8.8 8.8 0 1 0 8.8 8.8 2.7 2.7 0 0 1-3.1-3.1 2.7 2.7 0 0 1-3.1-3.1 2.7 2.7 0 0 1-2.6-2.6Z" fill="#f2b76b" stroke="#7c3f12" stroke-width="1.6" stroke-linejoin="round"></path>',
+      '<path d="M15.5 6.2c.8.5 1.5 1.2 2.1 2" fill="none" stroke="#fff3d6" stroke-width="1.4" stroke-linecap="round"></path>',
+      '<circle cx="8.3" cy="10" r="1.25" fill="#7c3f12"></circle>',
+      '<circle cx="12.5" cy="14.1" r="1.25" fill="#7c3f12"></circle>',
+      '<circle cx="8.8" cy="15.5" r="1" fill="#7c3f12"></circle>',
+      '<circle cx="14.9" cy="10.6" r=".9" fill="#7c3f12"></circle>',
+      '<path d="M12.7 18.2l2 1.7 3.4-4.1" fill="none" stroke="#0f766e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>',
+      "</svg>"
+    ].join("");
+    button.onclick = function () { showBanner(config); };
+    button.style.left = side === "left" ? "18px" : "auto";
+    button.style.right = side === "right" ? "18px" : "auto";
+    button.style.setProperty("--owncmp-bg", (banner.theme && banner.theme.background) || "#ffffff");
+    button.style.setProperty("--owncmp-border", (banner.theme && banner.theme.border) || "#d9dee7");
+    button.style.setProperty("--owncmp-primary", (banner.theme && banner.theme.primary) || "#0f766e");
+    injectStyles(banner.customCss);
+    appendToBody(button);
+  }
+
   function categoryControls(config, selection) {
     return config.categories.map(function (category) {
       var checked = selection[category.id] ? " checked" : "";
@@ -471,6 +530,7 @@
       ".owncmp-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.owncmp-actions-end{margin-top:14px}",
       ".owncmp-btn{min-height:40px;border-radius:var(--owncmp-control-radius);border:1px solid var(--owncmp-border);padding:0 14px;font:inherit;font-weight:700;cursor:pointer}.owncmp-primary{color:#fff;background:var(--owncmp-primary);border-color:var(--owncmp-primary)}.owncmp-neutral{color:#fff;background:var(--owncmp-neutral);border-color:var(--owncmp-neutral)}.owncmp-plain{background:#fff;color:var(--owncmp-text)}",
       ".owncmp-preferences{grid-column:1/-1;border-top:1px solid var(--owncmp-border);padding-top:14px}.owncmp-category-list{display:grid;gap:10px}.owncmp-category{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border:1px solid var(--owncmp-border);border-radius:var(--owncmp-radius)}.owncmp-category small{display:block;margin-top:3px;color:#667085}.owncmp-category input{width:20px;height:20px}",
+      ".owncmp-reopen{position:fixed;bottom:18px;z-index:2147483646;width:48px;height:48px;border-radius:999px;border:1px solid #8b5a2b;background:#fff7ed;color:#7c3f12;box-shadow:0 10px 28px rgba(29,31,36,.2);display:flex;align-items:center;justify-content:center;cursor:pointer}.owncmp-reopen svg{width:28px;height:28px;display:block}.owncmp-reopen-left{left:18px;right:auto}.owncmp-reopen-right{right:18px;left:auto}.owncmp-reopen:hover{background:#ffedd5;color:#6b2f0d}.owncmp-reopen:focus{outline:3px solid rgba(124,63,18,.28);outline-offset:2px}",
       "@media(max-width:720px){.owncmp-panel{grid-template-columns:1fr;left:8px;right:8px;bottom:8px}.owncmp-position-center .owncmp-panel{top:50%;bottom:auto}.owncmp-actions{justify-content:stretch}.owncmp-btn{flex:1 1 140px}}"
     ].join("") + (customCss ? "\n" + String(customCss) : "");
     document.head.appendChild(style);
@@ -497,7 +557,7 @@
     return {
       siteId: siteId,
       version: "fallback",
-      consentCookieName: "owncmp_consent",
+      consentCookieName: "CleanCmpConsent",
       consentTtlDays: 180,
       banner: {},
       googleConsentMode: {
@@ -510,7 +570,7 @@
         },
         regionalOverrides: []
       },
-      dataLayer: { eventName: "owncmp.consent_ready" },
+      dataLayer: { eventName: "cmp_consent_ready" },
       gpc: { enabled: true, showNotice: true, denyCategories: ["marketing", "personalization"] },
       cookieCleanup: { mode: "on_explicit_denial" },
       categories: [
@@ -536,10 +596,14 @@
         return this._config;
       },
       onReady: function (listener) {
-        if (this._consent) listener(this._consent);
-        this._listeners.push(listener);
+        this.addConsentListener(listener);
       },
       onChange: function (listener) {
+        if (typeof listener === "function") this._listeners.push(listener);
+      },
+      addConsentListener: function (listener) {
+        if (typeof listener !== "function") return;
+        if (this._consent) listener(this._consent);
         this._listeners.push(listener);
       },
       openBanner: function() {
@@ -560,11 +624,12 @@
         };
       },
       getConfig: function () {
-        if (this._config) showBanner(this._config);
+        return this._config;
       },
       resetConsent: function () {
         if (!this._config) return;
-        document.cookie = cookieName(this._config) + "=; Path=/; Max-Age=0; SameSite=Lax";
+        expireCookie(cookieName(this._config));
+        expireCookie(legacyCookieName(this._config));
         this._consent = null;
         showBanner(this._config);
       }
@@ -572,7 +637,62 @@
   }
 
   function attr(name, fallback) {
-    return script && script.getAttribute(name) || fallback;
+    var value = script && script.getAttribute(name);
+    if (value) return value;
+
+    var bootstrapName = {
+      "data-site-id": "siteId",
+      "data-config-url": "configUrl",
+      "data-layer": "dataLayerName",
+      "data-google-consent": "googleConsent",
+      "data-gtm-consent-fallback": "gtmConsentFallback"
+    }[name];
+    var bootstrapValue = bootstrapName ? bootstrap[bootstrapName] : null;
+    if (bootstrapValue === undefined && name === "data-layer") bootstrapValue = bootstrap.dataLayer;
+    if (bootstrapValue !== undefined && bootstrapValue !== null && bootstrapValue !== "") return String(bootstrapValue);
+
+    var queryName = {
+      "data-site-id": "siteId",
+      "data-config-url": "configUrl",
+      "data-layer": "dataLayer",
+      "data-google-consent": "googleConsent",
+      "data-gtm-consent-fallback": "gtmConsentFallback"
+    }[name];
+
+    return queryName ? scriptQueryParam(queryName, fallback) : fallback;
+  }
+
+  function consentEventName(config) {
+    var configured = config.dataLayer && config.dataLayer.eventName;
+    if (configured === "owncmp_consent_ready" || configured === "owncmp.consent_ready" || configured === "cmp.consent_ready") return "cmp_consent_ready";
+    return configured || "cmp_consent_ready";
+  }
+
+  function disclosurePageUrl(config) {
+    var cid = api._consent && api._consent.cid ? api._consent.cid : getPendingCid(config);
+    return publicBaseUrl() + "/disclosure.html?siteId=" + encodeURIComponent(config.siteId || siteId) + "&cid=" + encodeURIComponent(cid);
+  }
+
+  function publicBaseUrl() {
+    try {
+      var url = new URL(configUrl, window.location.href);
+      var marker = "/api/public/config";
+      var index = url.pathname.indexOf(marker);
+      var path = index === -1 ? "" : url.pathname.slice(0, index);
+      return url.origin + path;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function scriptQueryParam(name, fallback) {
+    if (!script || !script.src) return fallback;
+    try {
+      var params = new URL(script.src, window.location.href).searchParams;
+      return params.get(name) || fallback;
+    } catch (_) {
+      return fallback;
+    }
   }
 
   function lastScript() {
@@ -582,6 +702,16 @@
 
   function copy(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function safeRun(fn) {
+    try {
+      fn();
+    } catch (error) {
+      if (window.console && typeof console.warn === "function") {
+        console.warn("Own CMP non-critical runtime error:", error);
+      }
+    }
   }
 
   function cssEscape(value) {

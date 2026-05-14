@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG = {
   schemaVersion: 1,
   version: "draft",
   lastPublishedAt: null,
-  consentCookieName: "owncmp_consent",
+  consentCookieName: "CleanCmpConsent",
   consentTtlDays: 180,
   banner: {
     title: "Privacy choices",
@@ -41,6 +41,7 @@ export const DEFAULT_CONFIG = {
     saveText: "Save choices",
     closeText: "Close",
     position: "center",
+    reopenButtonPosition: "right",
     cornerStyle: "semi",
     language: "en",
     privacyPolicyUrl: "",
@@ -112,7 +113,7 @@ export const DEFAULT_CONFIG = {
     recordConsent: true
   },
   dataLayer: {
-    eventName: "owncmp.consent_ready"
+    eventName: "cmp_consent_ready"
   },
   integrations: {
     shopifyCustomerPrivacy: {
@@ -487,10 +488,20 @@ function safeSegment(value) {
 
 function safeBackupFilename(value) {
   const filename = String(value || "").trim();
-  if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}Z\.(sqlite|json)$/.test(filename)) {
+  if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}(\d{3})?Z\.(sqlite|json)$/.test(filename)) {
     throw new Error("Invalid backup filename");
   }
   return filename;
+}
+
+function normalizeConsentEventName(value) {
+  const eventName = String(value || "").trim();
+  if (eventName === "owncmp_consent_ready" || eventName === "owncmp.consent_ready" || eventName === "cmp.consent_ready") return "cmp_consent_ready";
+  return (eventName || DEFAULT_CONFIG.dataLayer.eventName).slice(0, 80);
+}
+
+function backupTimestamp(date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(".", "");
 }
 
 async function exportJsonBackup() {
@@ -509,6 +520,7 @@ function normalizeConfig(input, options = {}) {
   config.siteName = String(config.siteName || "Untitled Site").slice(0, 120);
   config.environment = "production";
   config.schemaVersion = 1;
+  config.consentCookieName = "CleanCmpConsent";
   config.updatedAt = touch ? new Date().toISOString() : (config.updatedAt || new Date().toISOString());
 
   if (!config.banner) config.banner = structuredClone(DEFAULT_CONFIG.banner);
@@ -516,6 +528,7 @@ function normalizeConfig(input, options = {}) {
     ...structuredClone(DEFAULT_CONFIG.banner),
     ...config.banner,
     position: ["bottom", "center"].includes(config.banner.position) ? config.banner.position : "center",
+    reopenButtonPosition: ["left", "right"].includes(config.banner.reopenButtonPosition) ? config.banner.reopenButtonPosition : "right",
     cornerStyle: ["round", "semi", "square"].includes(config.banner.cornerStyle) ? config.banner.cornerStyle : "semi",
     language: safeBannerLanguage(config.banner.language),
     privacyPolicyUrl: safePrivacyPolicyUrl(config.banner.privacyPolicyUrl),
@@ -559,7 +572,11 @@ function normalizeConfig(input, options = {}) {
     }
   }));
 
-  if (!config.dataLayer) config.dataLayer = structuredClone(DEFAULT_CONFIG.dataLayer);
+  config.dataLayer = {
+    ...structuredClone(DEFAULT_CONFIG.dataLayer),
+    ...(config.dataLayer || {}),
+    eventName: normalizeConsentEventName(config.dataLayer?.eventName)
+  };
   if (!config.integrations) config.integrations = structuredClone(DEFAULT_CONFIG.integrations);
   config.integrations.shopifyCustomerPrivacy = {
     ...structuredClone(DEFAULT_CONFIG.integrations.shopifyCustomerPrivacy),
@@ -1269,7 +1286,7 @@ export async function createStorageBackup() {
   await ensureInitialData();
   await fs.mkdir(BACKUP_DIR, { recursive: true });
   const createdAt = new Date();
-  const stamp = createdAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const stamp = backupTimestamp(createdAt);
   const driver = USE_SQLITE ? "sqlite" : "json";
   const filename = `owncmp-${driver}-${stamp}${USE_SQLITE ? ".sqlite" : ".json"}`;
   const backupPath = path.join(BACKUP_DIR, filename);
@@ -1303,7 +1320,7 @@ export async function listStorageBackups() {
 
   for (const file of files) {
     if (!file.isFile()) continue;
-    if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}Z\.(sqlite|json)$/.test(file.name)) continue;
+    if (!/^owncmp-(sqlite|json)-\d{8}T\d{6}(\d{3})?Z\.(sqlite|json)$/.test(file.name)) continue;
     const filePath = path.join(BACKUP_DIR, file.name);
     const stat = await fs.stat(filePath);
     backups.push({

@@ -68,8 +68,10 @@ data/backups/
 Backup filenames use this pattern:
 
 ```text
-owncmp-sqlite-YYYYMMDDTHHMMSSZ.sqlite
+owncmp-sqlite-YYYYMMDDTHHMMSSmmmZ.sqlite
 ```
+
+Older backups using `owncmp-sqlite-YYYYMMDDTHHMMSSZ.sqlite` remain valid for listing, download, and restore.
 
 Before a restore, Own CMP automatically creates a safety backup of the current SQLite database. This makes accidental restores reversible as long as the backup directory is preserved.
 

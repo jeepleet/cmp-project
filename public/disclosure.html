@@ -83,7 +83,8 @@
 
     <script>
         (function() {
-            const BASE_COOKIE_NAME = 'owncmp_consent';
+            const BASE_COOKIE_NAME = 'CleanCmpConsent';
+            const LEGACY_COOKIE_NAME = 'owncmp_consent';
             const FALLBACK_TEXTS = {
                 title: 'My Consent Data',
                 intro: 'Under GDPR transparency requirements, you have the right to know what consent data we store. Below is your unique identifier and your historical decision trail on this site.',
@@ -98,17 +99,19 @@
                 tableVersion: 'Version',
                 tableSource: 'Source',
                 tableDecisions: 'Decisions',
+                noDecisionDetails: 'No category decisions recorded',
                 unknownVersion: 'unknown',
                 errorPrefix: 'Error loading history:'
             };
             
             function readSiteCookie(cookieName, siteId) {
                 const cookies = document.cookie ? document.cookie.split(';') : [];
-                const exactName = cookieName && siteId ? `${cookieName}_${siteId}` : '';
+                const exactName = cookieName || '';
+                const legacyName = siteId ? `${LEGACY_COOKIE_NAME}_${siteId}` : '';
                 for (let i = 0; i < cookies.length; i++) {
                     const part = cookies[i].trim();
                     const name = part.split('=')[0];
-                    if ((exactName && name === exactName) || (!exactName && name.indexOf(BASE_COOKIE_NAME) === 0)) {
+                    if (name === BASE_COOKIE_NAME || (exactName && name === exactName) || (legacyName && name === legacyName) || (!exactName && name.indexOf(LEGACY_COOKIE_NAME) === 0)) {
                         try {
                             const value = decodeURIComponent(part.split('=')[1]);
                             return JSON.parse(value);
@@ -160,6 +163,7 @@
             async function initDisclosure() {
                 const params = new URLSearchParams(window.location.search);
                 let siteId = params.get('siteId') || 'demo-site';
+                const cidFromUrl = params.get('cid') || '';
                 let config = await loadConfig(siteId);
                 let stored = readSiteCookie(config?.consentCookieName || BASE_COOKIE_NAME, siteId) || readSiteCookie();
 
@@ -174,16 +178,17 @@
                 const historyContainer = document.getElementById('history-container');
                 applyTexts(texts, config?.banner?.language || 'en');
 
-                if (!stored || !stored.cid) {
+                const cid = stored?.cid || cidFromUrl;
+                if (!cid) {
                     cidDisplay.textContent = texts.noIdentifier;
                     historyContainer.innerHTML = `<div class="empty">${escapeHtml(texts.noSessionRecords)}</div>`;
                     return;
                 }
 
-                cidDisplay.textContent = stored.cid;
+                cidDisplay.textContent = cid;
                 const labels = categoryLabels(config);
 
-                fetch(`/api/public/disclosure/${encodeURIComponent(stored.siteId)}/${encodeURIComponent(stored.cid)}`)
+                fetch(`/api/public/disclosure/${encodeURIComponent(stored?.siteId || siteId)}/${encodeURIComponent(cid)}`)
                     .then(res => res.json())
                     .then(data => {
                     if (!data || data.length === 0) {
@@ -194,9 +199,12 @@
                     let html = `<table><thead><tr><th>${escapeHtml(texts.tableDate)}</th><th>${escapeHtml(texts.tableVersion)}</th><th>${escapeHtml(texts.tableSource)}</th><th>${escapeHtml(texts.tableDecisions)}</th></tr></thead><tbody>`;
                     data.forEach(entry => {
                         const date = new Date(entry.ts || entry.createdAt).toLocaleString();
-                        const categories = Object.entries(entry.categories).map(([id, granted]) => {
-                            return `<span class="pill ${granted ? 'granted' : 'denied'}">${escapeHtml(labels[id] || id)}</span>`;
-                        }).join(' ');
+                        const categoryState = entry && entry.categories && typeof entry.categories === 'object' ? entry.categories : null;
+                        const categories = categoryState && Object.keys(categoryState).length > 0
+                            ? Object.entries(categoryState).map(([id, granted]) => {
+                                return `<span class="pill ${granted ? 'granted' : 'denied'}">${escapeHtml(labels[id] || id)}</span>`;
+                            }).join(' ')
+                            : `<span class="pill">${escapeHtml(entry.action || entry.type || texts.noDecisionDetails)}</span>`;
 
                         html += `
                             <tr>

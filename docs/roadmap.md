@@ -68,8 +68,8 @@
 - Resolve production Node runtime strategy: verify Node 24 LTS compatibility or pin a supported deployment image deliberately
 - Mount Railway persistent storage at `/app/data` for `data/owncmp.sqlite`, backups, and published configs
 - Configure `cmp.example.com` as a Railway custom domain behind Cloudflare proxy
-- Add Cloudflare cache rules for runtime script, active config, pinned config, and GPC declaration
-- Bypass Cloudflare cache for Admin, consent writes, disclosure history, reports, exports, and storage APIs
+- [x] Add Cloudflare cache rules for runtime script, active config, public config fallback for pinned versions, and GPC declaration
+- [x] Bypass Cloudflare cache for Admin, consent writes, disclosure history, reports, exports, and storage APIs
 - Configure production environment variables and secret handling
 - Establish automated backup export and restore testing
 - Add uptime monitoring, log retention, and basic alerting
@@ -78,6 +78,19 @@
 - Verify GTM Consent Mode bridge on the live domain
 - Verify public config caching, disclosure page, GPC resource, and consent record writes
 - Document operational ownership and maintenance schedule
+
+## Phase GTM Tag Fix
+
+- Replace the current query-parameter-based GTM runtime injection with a stable production install surface.
+- Ensure normal code fixes go live without customer GTM edits, temporary `?v=...` URLs, manual Cloudflare purges, or template re-imports.
+- Make the GTM template inject one stable script URL only.
+- Move runtime settings handoff out of the injected script URL and into a stable bootstrap/global contract.
+- Configure runtime/cache behavior so deployed fixes propagate automatically through Railway and Cloudflare.
+- Keep active production config as the default GTM config endpoint.
+- Preserve backward compatibility for existing hardcoded script installs.
+- Verify GTM Preview and live website behavior without workarounds.
+
+Current local implementation uses `window.OwnCMPBootstrap` and injects `https://cmp.cleancmp.com/cmp/owncmp.js` without query parameters. Live GTM Preview verification is still required before this phase is complete.
 
 ## Later Track: Product Polish
 

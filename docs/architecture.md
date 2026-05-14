@@ -91,6 +91,8 @@ Cache-Control: public, max-age=31536000, immutable
 
 Use the active URL when a site should automatically receive the newest production publish. Use the version-pinned URL when a launch needs a frozen config that changes only when the snippet is updated.
 
+The stable runtime script at `/cmp/owncmp.js` uses `Cache-Control: public, no-cache, must-revalidate` with `ETag` and `Last-Modified`. The URL stays stable for GTM installs, but browsers and edge caches must revalidate it so routine runtime fixes can deploy without asking website owners to add cache-busting query strings.
+
 The special `preview` environment returns the requested site's current draft config and requires an active admin session.
 
 The public changelog endpoint is:
@@ -149,16 +151,21 @@ The Admin Storage panel uses this endpoint to show user-facing data-store health
 - Reads stored consent if available.
 - Shows a banner if there is no valid decision.
 - Supports centered default or bottom banner placement.
+- Supports a persistent cookie preferences icon on the left or right side of the page so visitors can reopen the banner.
 - Supports round, semi-round, or square banner corner styling.
 - Supports an optional banner logo and site-defined custom banner CSS from config.
 - Supports configured banner language copy, localized category labels, localized disclosure text, and an optional privacy policy link.
 - Updates Google consent state after a user decision.
 - Optionally syncs explicit user choices to Shopify Customer Privacy API when enabled.
-- Pushes one stable dataLayer event shape.
+- Pushes one stable dataLayer event shape. The current default event name is `cmp_consent_ready`.
 - Deletes configured cookies only after explicit denial.
 - Notifies `window.OwnCMPGtmBridge` when a GTM bridge is installed.
 - Supports regional Consent Mode defaults from `googleConsentMode.regionalOverrides`.
 - Detects `navigator.globalPrivacyControl` and applies configured GPC-denied categories before user interaction.
+- Stores Own CMP consent in `CleanCmpConsent`. The runtime can read and migrate the legacy `owncmp_consent_:siteId` cookie name.
+- Links disclosure history to the CMP host and includes the visitor's consent ID in the URL so disclosure works when the CMP runs on a different domain from the website.
+- Renders disclosure history records defensively, because server history can include banner impressions or legacy records without category decisions.
+- Normalizes legacy `owncmp_consent_ready`, `owncmp.consent_ready`, and previous `cmp.consent_ready` event names to `cmp_consent_ready` when old config values are encountered.
 
 ### GPC support resource
 
@@ -202,9 +209,9 @@ The values are mapped from the visitor's explicit Own CMP choice:
 
 The runtime only syncs explicit user choices. It does not automatically write stored consent back into Shopify on page load, and it does not set `sale_of_data` from the normal cookie banner.
 
-### GTM bridge
+### GTM runtime loader and bridge
 
-The GTM bridge source pack is in `gtm/`.
+The GTM runtime loader and bridge source pack is in `gtm/`.
 
 The generated importable template is `gtm/template.tpl`. The source files are:
 
@@ -212,13 +219,22 @@ The generated importable template is `gtm/template.tpl`. The source files are:
 - `gtm/template-fields.json`
 - `src/server/build-gtm.js`
 
-The bridge:
+The current template:
 
 - Runs on `Consent Initialization - All Pages`.
 - Calls `setDefaultConsentState` for conservative defaults.
 - Registers `window.OwnCMPGtmBridge`.
-- Listens to `window.OwnCMP.onReady` and `window.OwnCMP.onChange`.
+- Registers its consent update callback with `window.OwnCMPAddConsentListener` when the runtime is available, with `window.OwnCMP.onReady` and `window.OwnCMP.onChange` as older-runtime fallbacks.
+- Sets `window.OwnCMPBootstrap` with `siteId`, active config URL, dataLayer name, `googleConsent=false`, and `gtmConsentFallback=true`.
+- Injects the stable `https://cmp.cleancmp.com/cmp/owncmp.js` URL without dynamic query parameters.
+- Can run in bridge-only mode when the runtime script is hardcoded on the website.
 - Calls `updateConsentState` from Own CMP consent records.
+
+In GTM bridge mode, the template uses `OwnCMPAddConsentListener` as the primary update path and keeps `OwnCMPGtmBridge` as a fallback. In GTM deployment mode, the runtime reads `window.OwnCMPBootstrap` before falling back to `data-*` attributes or legacy query parameters. The bootstrap fallback lets the runtime push a direct Consent Mode update before the canonical dataLayer event if GTM Preview does not surface the sandbox callback update. The runtime notifies GTM listeners and then calls `OwnCMPGtmBridge` before it pushes the configured dataLayer event, which defaults to `cmp_consent_ready`.
+
+### Phase GTM Tag Fix target
+
+The production target is a stable GTM install surface. The GTM template should inject one stable script URL and should not append dynamic query parameters to the injected script URL. Runtime settings should be passed through a stable bootstrap/global contract instead. Normal runtime fixes must roll out through the Own CMP platform without customer GTM edits, manual Cloudflare purges, temporary cache-busting URLs, or template re-imports.
 
 ## Consent Mode Defaults
 

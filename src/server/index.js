@@ -699,7 +699,7 @@ async function serveStatic(req, requestPath, res) {
     };
 
     if (pathname.startsWith("/cmp/")) {
-      headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=86400";
+      headers["Cache-Control"] = "public, no-cache, must-revalidate";
       headers["Access-Control-Allow-Origin"] = "*";
     }
 
